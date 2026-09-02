@@ -1,18 +1,40 @@
-import { useState } from "react";
-import { ArrowLeft, ChevronRight, Check, Image as ImageIcon, Sparkles } from "lucide-react";
+import { useState, useRef } from "react";
+import { ArrowLeft, ChevronRight, Check, Image as ImageIcon, Sparkles, Upload, RefreshCw } from "lucide-react";
+import { useChatContext } from "../../context/ChatContext";
 import toast from "react-hot-toast";
 
-const ChatsSettings = ({ onBack }) => {
-  const [subView, setSubView] = useState(null); // null | "theme" | "wallpaper" | "media_quality" | "media_download"
+const WALLPAPER_COLORS = [
+  { id: "default", bg: "bg-[#0b141a]", label: "Dark Slate" },
+  { id: "emerald", bg: "bg-[#062419]", label: "Emerald" },
+  { id: "midnight", bg: "bg-[#0f172a]", label: "Midnight" },
+  { id: "purple", bg: "bg-[#1e102d]", label: "Amethyst" },
+  { id: "navy", bg: "bg-[#0a192f]", label: "Deep Navy" },
+  { id: "warm", bg: "bg-[#1c1917]", label: "Warm Charcoal" },
+  { id: "burgundy", bg: "bg-[#280914]", label: "Burgundy" }
+];
 
-  // Chats states matching screenshot
-  const [theme, setTheme] = useState("System default");
-  const [wallpaperDoodle, setWallpaperDoodle] = useState(true);
-  const [wallpaperColor, setWallpaperColor] = useState("default");
-  const [mediaQuality, setMediaQuality] = useState("HD quality");
-  const [spellCheck, setSpellCheck] = useState(true);
-  const [replaceEmoji, setReplaceEmoji] = useState(true);
-  const [enterIsSend, setEnterIsSend] = useState(true);
+const ChatsSettings = ({ onBack }) => {
+  const {
+    theme,
+    setTheme,
+    wallpaperColor,
+    setWallpaperColor,
+    wallpaperDoodle,
+    setWallpaperDoodle,
+    customWallpaperUrl,
+    setCustomWallpaperUrl,
+    mediaQuality,
+    setMediaQuality,
+    spellCheck,
+    setSpellCheck,
+    replaceEmoji,
+    setReplaceEmoji,
+    enterIsSend,
+    setEnterIsSend
+  } = useChatContext();
+
+  const [subView, setSubView] = useState(null); // null | "theme" | "wallpaper" | "media_quality" | "media_download"
+  const wallpaperInputRef = useRef(null);
 
   // Auto-download states
   const [downloadPhotos, setDownloadPhotos] = useState(true);
@@ -20,12 +42,31 @@ const ChatsSettings = ({ onBack }) => {
   const [downloadVideos, setDownloadVideos] = useState(false);
   const [downloadDocs, setDownloadDocs] = useState(true);
 
+  const handleCustomWallpaperUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCustomWallpaperUrl(reader.result);
+        toast.success("Custom chat wallpaper applied! 🖼️");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleResetWallpaper = () => {
+    setCustomWallpaperUrl("");
+    setWallpaperColor("default");
+    setWallpaperDoodle(true);
+    toast.success("Wallpaper reset to default WhatsApp theme 🎨");
+  };
+
   // ================= 1. SUB-VIEW: THEME =================
   if (subView === "theme") {
     return (
       <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
         <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
+          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h2 className="text-lg font-bold text-slate-100">Theme</h2>
@@ -36,7 +77,7 @@ const ChatsSettings = ({ onBack }) => {
               key={t}
               onClick={() => {
                 setTheme(t);
-                toast.success(`Theme set to ${t}`);
+                toast.success(`Theme set to ${t} 🎨`);
               }}
               className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
             >
@@ -54,7 +95,7 @@ const ChatsSettings = ({ onBack }) => {
     return (
       <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
         <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
+          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h2 className="text-lg font-bold text-slate-100">Set chat wallpaper</h2>
@@ -72,7 +113,7 @@ const ChatsSettings = ({ onBack }) => {
                 checked={wallpaperDoodle}
                 onChange={(e) => {
                   setWallpaperDoodle(e.target.checked);
-                  toast(e.target.checked ? "Doodles enabled" : "Doodles hidden");
+                  toast(e.target.checked ? "Doodles enabled ✏️" : "Doodles hidden");
                 }}
                 className="sr-only peer"
               />
@@ -80,27 +121,61 @@ const ChatsSettings = ({ onBack }) => {
             </label>
           </div>
 
-          <span className="text-xs font-semibold text-slate-400 block pt-1">Solid Colors</span>
-          <div className="grid grid-cols-4 gap-3">
-            {[
-              { id: "default", bg: "bg-[#0b141a]", label: "Dark" },
-              { id: "emerald", bg: "bg-[#062419]", label: "Emerald" },
-              { id: "midnight", bg: "bg-[#0f172a]", label: "Midnight" },
-              { id: "purple", bg: "bg-[#1e102d]", label: "Amethyst" }
-            ].map((c) => (
-              <div
-                key={c.id}
-                onClick={() => {
-                  setWallpaperColor(c.id);
-                  toast.success(`Wallpaper color set to ${c.label}`);
-                }}
-                className={`aspect-square rounded-2xl ${c.bg} border-2 flex items-center justify-center cursor-pointer transition-transform hover:scale-105 ${
-                  wallpaperColor === c.id ? "border-emerald-400 scale-105" : "border-slate-700"
-                }`}
+          {/* Solid Colors Palette */}
+          <div>
+            <span className="text-xs font-semibold text-slate-400 block pb-2.5">Solid Colors</span>
+            <div className="grid grid-cols-4 gap-3">
+              {WALLPAPER_COLORS.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => {
+                    setCustomWallpaperUrl("");
+                    setWallpaperColor(c.id);
+                    toast.success(`Wallpaper set to ${c.label}`);
+                  }}
+                  className={`aspect-square rounded-2xl ${c.bg} border-2 flex flex-col items-center justify-center cursor-pointer transition-transform hover:scale-105 ${
+                    !customWallpaperUrl && wallpaperColor === c.id
+                      ? "border-emerald-400 scale-105 shadow-lg shadow-emerald-500/20"
+                      : "border-slate-700"
+                  }`}
+                  title={c.label}
+                >
+                  {!customWallpaperUrl && wallpaperColor === c.id && (
+                    <Check className="w-5 h-5 text-emerald-400" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Image Wallpaper Upload */}
+          <div className="space-y-2 pt-2 border-t border-slate-800">
+            <span className="text-xs font-semibold text-slate-400 block">Custom Image Wallpaper</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => wallpaperInputRef.current?.click()}
+                className="flex-1 py-2.5 px-3 bg-[#202c33] hover:bg-[#2a3942] border border-slate-700 rounded-xl text-xs font-semibold text-emerald-400 flex items-center justify-center gap-2 transition-colors cursor-pointer"
               >
-                {wallpaperColor === c.id && <Check className="w-4 h-4 text-emerald-400" />}
-              </div>
-            ))}
+                <Upload className="w-4 h-4" />
+                <span>Upload Custom Image</span>
+              </button>
+
+              <button
+                onClick={handleResetWallpaper}
+                className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+                title="Reset to default"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+
+            <input
+              ref={wallpaperInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCustomWallpaperUpload}
+              className="hidden"
+            />
           </div>
         </div>
       </div>
@@ -112,7 +187,7 @@ const ChatsSettings = ({ onBack }) => {
     return (
       <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
         <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
+          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h2 className="text-lg font-bold text-slate-100">Media upload quality</h2>
@@ -150,7 +225,7 @@ const ChatsSettings = ({ onBack }) => {
     return (
       <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
         <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
+          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h2 className="text-lg font-bold text-slate-100">Media auto-download</h2>
@@ -189,7 +264,7 @@ const ChatsSettings = ({ onBack }) => {
       <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
         <button
           onClick={onBack}
-          className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+          className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
           title="Back to Settings"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -222,7 +297,12 @@ const ChatsSettings = ({ onBack }) => {
             onClick={() => setSubView("wallpaper")}
             className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
           >
-            <span className="text-sm font-medium text-slate-200">Wallpaper</span>
+            <div>
+              <span className="text-sm font-medium text-slate-200 block">Wallpaper</span>
+              <span className="text-xs text-slate-400">
+                {customWallpaperUrl ? "Custom image" : `${wallpaperColor} ${wallpaperDoodle ? "(Doodles)" : ""}`}
+              </span>
+            </div>
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </div>
         </div>

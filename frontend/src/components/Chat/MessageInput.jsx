@@ -17,7 +17,7 @@ const MessageInput = () => {
   const [pendingImage, setPendingImage] = useState(null); // { file, url }
   const [showCameraModal, setShowCameraModal] = useState(false);
 
-  const { sendMessage, emitTyping } = useChatContext();
+  const { sendMessage, emitTyping, enterIsSend } = useChatContext();
   const typingTimeoutRef = useRef(null);
   const inputRef = useRef(null);
   const attachRef = useRef(null);
@@ -33,6 +33,15 @@ const MessageInput = () => {
     typingTimeoutRef.current = setTimeout(() => {
       emitTyping(false);
     }, 1500);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      if (enterIsSend) {
+        e.preventDefault();
+        handleSend(e);
+      }
+    }
   };
 
   const handleSend = async (e) => {
@@ -246,6 +255,7 @@ const MessageInput = () => {
               placeholder="Type a message..."
               value={message}
               onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
               className="w-full py-2.5 px-4 bg-[#2a3942] rounded-xl text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#00a884]/50 transition-all"
             />
           </div>

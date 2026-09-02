@@ -1,22 +1,22 @@
-import { MessageSquare, Phone, Radio, Users2, Sparkles, Star, Settings, Calendar } from "lucide-react";
+import { MessageSquare, Phone, Radio, Users2, Sparkles, Star, Settings, Calendar, Mic } from "lucide-react";
 import { useAuthContext } from "../../context/AuthContext";
 import { useChatContext } from "../../context/ChatContext";
 
-const NavRail = ({ activeNav, setActiveNav, onOpenProfile }) => {
+const NavRail = ({ activeNav, setActiveNav, onOpenProfile, onOpenVoiceAssistant }) => {
   const { authUser } = useAuthContext();
   const { conversations } = useChatContext();
 
   const totalUnread = conversations.length > 0 ? conversations.length : 0;
 
   return (
-    <div className="w-14 md:w-16 h-full flex flex-col items-center justify-between py-3 bg-[#0d131f] border-r border-slate-800/80 flex-shrink-0 z-20 box-border">
+    <div className="w-14 md:w-16 h-full flex flex-col items-center justify-between py-3 bg-[#0d131f] border-r border-slate-800/80 flex-shrink-0 z-20 box-border select-none">
       {/* Top Navigation Icons */}
       <div className="flex flex-col items-center gap-1.5 w-full">
         {/* Chats Tab */}
         <button
           onClick={() => setActiveNav("chats")}
           title="Chats"
-          className={`relative p-2.5 rounded-xl transition-all ${
+          className={`relative p-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === "chats"
               ? "bg-slate-800 text-emerald-400 shadow-md"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
@@ -30,11 +30,11 @@ const NavRail = ({ activeNav, setActiveNav, onOpenProfile }) => {
           )}
         </button>
 
-        {/* Meetings Tab (Matching Screenshot 1:1) */}
+        {/* Meetings Tab */}
         <button
           onClick={() => setActiveNav("meetings")}
           title="Meetings"
-          className={`p-2.5 rounded-xl transition-all ${
+          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === "meetings"
               ? "bg-[#25396e] text-white shadow-md ring-1 ring-blue-500/50"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
@@ -47,7 +47,7 @@ const NavRail = ({ activeNav, setActiveNav, onOpenProfile }) => {
         <button
           onClick={() => setActiveNav("calls")}
           title="Calls"
-          className={`p-2.5 rounded-xl transition-all ${
+          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === "calls"
               ? "bg-slate-800 text-emerald-400 shadow-md"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
@@ -60,7 +60,7 @@ const NavRail = ({ activeNav, setActiveNav, onOpenProfile }) => {
         <button
           onClick={() => setActiveNav("status")}
           title="Status & Stories"
-          className={`p-2.5 rounded-xl transition-all ${
+          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === "status"
               ? "bg-slate-800 text-emerald-400 shadow-md"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
@@ -73,7 +73,7 @@ const NavRail = ({ activeNav, setActiveNav, onOpenProfile }) => {
         <button
           onClick={() => setActiveNav("communities")}
           title="Communities"
-          className={`p-2.5 rounded-xl transition-all ${
+          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === "communities"
               ? "bg-slate-800 text-emerald-400 shadow-md"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
@@ -82,11 +82,21 @@ const NavRail = ({ activeNav, setActiveNav, onOpenProfile }) => {
           <Users2 className="w-5 h-5" />
         </button>
 
-        {/* Aryavarta AI Sparkle (WhatsApp style purple glowing icon) */}
+        {/* 🎙️ Voice Assistant Live Launcher Button */}
+        <button
+          onClick={onOpenVoiceAssistant}
+          title="Speak to Voice Assistant"
+          className="relative p-2.5 rounded-xl transition-all my-1 group bg-gradient-to-tr from-purple-900/60 to-indigo-900/60 hover:from-purple-800 hover:to-indigo-800 text-purple-300 ring-1 ring-purple-500/40 shadow-lg shadow-purple-600/20 cursor-pointer"
+        >
+          <Mic className="w-5 h-5 text-purple-300 animate-pulse" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-purple-400 rounded-full animate-ping" />
+        </button>
+
+        {/* Aryavarta AI Chat Tab */}
         <button
           onClick={() => setActiveNav("ai")}
-          title="Ask Aryavarta AI Assistant"
-          className={`relative p-2.5 rounded-xl transition-all my-1 group ${
+          title="Aryavarta AI Chat"
+          className={`relative p-2.5 rounded-xl transition-all my-0.5 group cursor-pointer ${
             activeNav === "ai"
               ? "bg-purple-950/70 text-purple-300 ring-2 ring-purple-500/60 shadow-lg shadow-purple-500/30"
               : "text-purple-400 hover:bg-purple-950/40 hover:text-purple-300"
@@ -97,14 +107,13 @@ const NavRail = ({ activeNav, setActiveNav, onOpenProfile }) => {
               <Sparkles className="w-3 h-3 text-purple-300" />
             </div>
           </div>
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-purple-400 rounded-full animate-ping" />
         </button>
 
         {/* Starred Messages */}
         <button
           onClick={() => setActiveNav("starred")}
           title="Starred Messages"
-          className={`p-2.5 rounded-xl transition-all ${
+          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === "starred"
               ? "bg-slate-800 text-amber-400 shadow-md"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
@@ -120,7 +129,7 @@ const NavRail = ({ activeNav, setActiveNav, onOpenProfile }) => {
         <button
           onClick={() => setActiveNav("settings")}
           title="Settings"
-          className={`p-2.5 rounded-xl transition-all ${
+          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === "settings"
               ? "bg-slate-800 text-emerald-400 shadow-md"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"

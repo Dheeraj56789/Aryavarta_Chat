@@ -1,275 +1,157 @@
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, Check, Plus, Trash2, Shield, Lock } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  Check,
+  Plus,
+  Trash2,
+  Shield,
+  Lock,
+  Smartphone,
+  Users,
+  Phone,
+  Eye,
+  Video,
+  FileText,
+  UserX,
+  ExternalLink
+} from "lucide-react";
 import toast from "react-hot-toast";
 
+const PRIVACY_OPTIONS = ["Everybody", "My contacts", "Nobody"];
+
 const PrivacySettings = ({ onBack }) => {
-  const [subView, setSubView] = useState(null); // null | "last_seen" | "profile_pic" | "about" | "status" | "timer" | "groups" | "blocked" | "app_lock"
+  const [subView, setSubView] = useState(null); // null | "app_lock" | "blocked" | "phone" | "last_seen" | "new_chat" | "calls" | "meetings" | "groups" | "profile" | "stories" | "terms" | "privacy_doc"
 
-  // Privacy states matching screenshots
-  const [lastSeen, setLastSeen] = useState("Nobody");
-  const [profilePic, setProfilePic] = useState("My contacts");
-  const [about, setAbout] = useState("My contacts");
-  const [status, setStatus] = useState("My contacts");
-  const [readReceipts, setReadReceipts] = useState(true);
-  const [defaultTimer, setDefaultTimer] = useState("Off");
-  const [groups, setGroups] = useState("Everyone");
-  const [blockedCount, setBlockedCount] = useState(4);
-  const [appLockEnabled, setAppLockEnabled] = useState(false);
+  // Privacy states matching exact screenshot model
+  const [appLockEnabled, setAppLockEnabled] = useState(true);
   const [appLockPin, setAppLockPin] = useState("1234");
+  const [blockedList, setBlockedList] = useState([]);
+  
+  const [phoneNumberVisibility, setPhoneNumberVisibility] = useState("My contacts");
+  const [lastSeenVisibility, setLastSeenVisibility] = useState("Everybody");
+  const [newChatVisibility, setNewChatVisibility] = useState("Everybody");
+  const [callsVisibility, setCallsVisibility] = useState("My contacts");
+  const [meetingsVisibility, setMeetingsVisibility] = useState("Everybody");
+  const [groupsVisibility, setGroupsVisibility] = useState("My contacts");
+  const [profilePhotoVisibility, setProfilePhotoVisibility] = useState("My contacts");
+  const [storiesVisibility, setStoriesVisibility] = useState("My contacts");
 
-  // Advanced section states matching screenshot 2
-  const [blockUnknown, setBlockUnknown] = useState(false);
+  // Toggles matching screenshot 2
+  const [readReceipts, setReadReceipts] = useState(true);
+  const [syncContacts, setSyncContacts] = useState(false);
+  const [screenSecurity, setScreenSecurity] = useState(true);
   const [protectIP, setProtectIP] = useState(false);
-  const [turnOffPreviews, setTurnOffPreviews] = useState(false);
+  const [shareDiagnostics, setShareDiagnostics] = useState(true);
 
-  // Sample blocked contacts list
-  const [blockedList, setBlockedList] = useState([
-    { id: 1, name: "Spam Caller (+91 91234 56789)" },
-    { id: 2, name: "Unknown Telemarketer (+91 80000 11111)" },
-    { id: 3, name: "Crypto Bot (+1 555 0199)" },
-    { id: 4, name: "Ad Promotion (+91 99999 88888)" }
-  ]);
-
-  // ================= 1. SUB-VIEW: LAST SEEN AND ONLINE =================
-  if (subView === "last_seen") {
-    return (
-      <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
-        <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-lg font-bold text-slate-100">Last seen and online</h2>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-          <span className="text-xs font-semibold text-slate-400 block">Who can see my last seen</span>
-          {["Everyone", "My contacts", "Nobody"].map((opt) => (
-            <div
-              key={opt}
-              onClick={() => {
-                setLastSeen(opt);
-                toast.success(`Last seen set to ${opt}`);
-              }}
-              className="flex items-center justify-between p-3 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-            >
-              <span className="text-sm text-slate-200">{opt}</span>
-              {lastSeen === opt && <Check className="w-4 h-4 text-emerald-400" />}
-            </div>
-          ))}
-        </div>
+  // Sub-view helper renderer for standard visibility options
+  const renderVisibilitySubView = (title, currentValue, onSelect) => (
+    <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
+      <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
+        <button
+          onClick={() => setSubView(null)}
+          className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h2 className="text-lg font-bold text-slate-100">{title}</h2>
       </div>
-    );
-  }
 
-  // ================= 2. SUB-VIEW: PROFILE PICTURE =================
-  if (subView === "profile_pic") {
-    return (
-      <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
-        <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-lg font-bold text-slate-100">Profile picture</h2>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-          <span className="text-xs font-semibold text-slate-400 block">Who can see my profile picture</span>
-          {["Everyone", "My contacts", "Nobody"].map((opt) => (
-            <div
-              key={opt}
-              onClick={() => {
-                setProfilePic(opt);
-                toast.success(`Profile picture visibility set to ${opt}`);
-              }}
-              className="flex items-center justify-between p-3 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-            >
-              <span className="text-sm text-slate-200">{opt}</span>
-              {profilePic === opt && <Check className="w-4 h-4 text-emerald-400" />}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ================= 3. SUB-VIEW: ABOUT =================
-  if (subView === "about") {
-    return (
-      <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
-        <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-lg font-bold text-slate-100">About</h2>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-          <span className="text-xs font-semibold text-slate-400 block">Who can see my about</span>
-          {["Everyone", "My contacts", "Nobody"].map((opt) => (
-            <div
-              key={opt}
-              onClick={() => {
-                setAbout(opt);
-                toast.success(`About status visibility set to ${opt}`);
-              }}
-              className="flex items-center justify-between p-3 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-            >
-              <span className="text-sm text-slate-200">{opt}</span>
-              {about === opt && <Check className="w-4 h-4 text-emerald-400" />}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ================= 4. SUB-VIEW: STATUS =================
-  if (subView === "status") {
-    return (
-      <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
-        <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-lg font-bold text-slate-100">Status privacy</h2>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-          <span className="text-xs font-semibold text-slate-400 block">Who can see my status updates</span>
-          {["My contacts", "My contacts except...", "Only share with..."].map((opt) => (
-            <div
-              key={opt}
-              onClick={() => {
-                setStatus(opt);
-                toast.success(`Status visibility set to ${opt}`);
-              }}
-              className="flex items-center justify-between p-3 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-            >
-              <span className="text-sm text-slate-200">{opt}</span>
-              {status === opt && <Check className="w-4 h-4 text-emerald-400" />}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ================= 5. SUB-VIEW: DEFAULT MESSAGE TIMER =================
-  if (subView === "timer") {
-    return (
-      <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
-        <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-lg font-bold text-slate-100">Default message timer</h2>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-          <span className="text-xs font-semibold text-slate-400 block">Start new chats with disappearing messages set to</span>
-          {["24 hours", "7 days", "90 days", "Off"].map((opt) => (
-            <div
-              key={opt}
-              onClick={() => {
-                setDefaultTimer(opt);
-                toast.success(`Default timer set to ${opt}`);
-              }}
-              className="flex items-center justify-between p-3 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-            >
-              <span className="text-sm text-slate-200">{opt}</span>
-              {defaultTimer === opt && <Check className="w-4 h-4 text-emerald-400" />}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ================= 6. SUB-VIEW: BLOCKED CONTACTS =================
-  if (subView === "blocked") {
-    return (
-      <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
-        <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-lg font-bold text-slate-100">Blocked contacts</h2>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-          <button
-            onClick={() => toast.success("Select a contact to block")}
-            className="w-full flex items-center gap-3 p-3 bg-[#202c33] hover:bg-[#2a3942] rounded-2xl text-xs font-semibold text-emerald-400 border border-slate-750 transition-colors"
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+        <span className="text-xs font-semibold text-slate-400 block px-1">Who can see my {title.toLowerCase()}</span>
+        {PRIVACY_OPTIONS.map((opt) => (
+          <div
+            key={opt}
+            onClick={() => {
+              onSelect(opt);
+              toast.success(`${title} set to ${opt}`);
+              setSubView(null);
+            }}
+            className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors bg-[#182229] border border-slate-800"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add blocked contact</span>
-          </button>
-
-          <span className="text-xs font-semibold text-slate-400 block pt-2">
-            Blocked list ({blockedList.length})
-          </span>
-
-          {blockedList.map((contact) => (
-            <div
-              key={contact.id}
-              className="flex items-center justify-between p-3 bg-[#202c33] rounded-2xl border border-slate-700/60"
-            >
-              <span className="text-xs text-slate-200 font-medium truncate">{contact.name}</span>
-              <button
-                onClick={() => {
-                  const updated = blockedList.filter((c) => c.id !== contact.id);
-                  setBlockedList(updated);
-                  setBlockedCount(updated.length);
-                  toast.success("Contact unblocked 🔓");
-                }}
-                className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors"
-                title="Unblock"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
+            <span className="text-sm font-medium text-slate-200">{opt}</span>
+            {currentValue === opt && <Check className="w-4 h-4 text-[#5c7cd8]" />}
+          </div>
+        ))}
       </div>
-    );
+    </div>
+  );
+
+  // ================= 1. SUB-VIEWS =================
+  if (subView === "phone") {
+    return renderVisibilitySubView("Phone number", phoneNumberVisibility, setPhoneNumberVisibility);
+  }
+  if (subView === "last_seen") {
+    return renderVisibilitySubView("Last seen & online", lastSeenVisibility, setLastSeenVisibility);
+  }
+  if (subView === "new_chat") {
+    return renderVisibilitySubView("New chat", newChatVisibility, setNewChatVisibility);
+  }
+  if (subView === "calls") {
+    return renderVisibilitySubView("Calls", callsVisibility, setCallsVisibility);
+  }
+  if (subView === "meetings") {
+    return renderVisibilitySubView("Meetings", meetingsVisibility, setMeetingsVisibility);
+  }
+  if (subView === "groups") {
+    return renderVisibilitySubView("Add to groups", groupsVisibility, setGroupsVisibility);
+  }
+  if (subView === "profile") {
+    return renderVisibilitySubView("Profile photo", profilePhotoVisibility, setProfilePhotoVisibility);
+  }
+  if (subView === "stories") {
+    return renderVisibilitySubView("Stories", storiesVisibility, setStoriesVisibility);
   }
 
-  // ================= 7. SUB-VIEW: APP LOCK =================
+  // ================= APP LOCK SUB-VIEW =================
   if (subView === "app_lock") {
     return (
       <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
         <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
-          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white">
+          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h2 className="text-lg font-bold text-slate-100">App lock</h2>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-6">
-          <div className="flex items-start justify-between">
-            <div className="pr-4">
-              <span className="text-sm font-medium text-slate-200 block">Require password to unlock Aryavarta</span>
-              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                When enabled, you will need to enter your 4-digit PIN to open Aryavarta.
-              </p>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+          <div className="flex items-center justify-between p-4 bg-[#182229] rounded-2xl border border-slate-800">
+            <div>
+              <span className="text-sm font-bold text-slate-100 block">Require PIN / Biometrics</span>
+              <p className="text-xs text-slate-400 mt-0.5">Lock app when inactive</p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
+            <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={appLockEnabled}
                 onChange={(e) => {
                   setAppLockEnabled(e.target.checked);
-                  toast(e.target.checked ? "App Lock Enabled 🔒" : "App Lock Disabled 🔓");
+                  toast(e.target.checked ? "App lock enabled 🔒" : "App lock disabled 🔓");
                 }}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a884]"></div>
+              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5c7cd8]"></div>
             </label>
           </div>
 
           {appLockEnabled && (
-            <div className="p-4 bg-[#202c33] rounded-2xl border border-slate-700 space-y-3">
-              <span className="text-xs font-semibold text-slate-300">Set 4-digit PIN:</span>
-              <input
-                type="password"
-                maxLength={4}
-                value={appLockPin}
-                onChange={(e) => setAppLockPin(e.target.value)}
-                className="w-full py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl text-center text-sm text-slate-100 font-mono tracking-widest"
-              />
+            <div className="p-4 bg-[#182229] rounded-2xl border border-slate-800 space-y-3">
+              <span className="text-xs font-semibold text-slate-300 block">Change 4-digit PIN</span>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  maxLength={4}
+                  value={appLockPin}
+                  onChange={(e) => setAppLockPin(e.target.value)}
+                  className="w-32 py-2 px-3 bg-[#202c33] border border-slate-700 rounded-xl text-center text-sm font-mono tracking-widest text-white focus:outline-none focus:border-[#5c7cd8]"
+                />
+                <button
+                  onClick={() => toast.success("PIN updated successfully! 🔑")}
+                  className="px-4 py-2 bg-[#5c7cd8] hover:bg-[#4a6ac6] text-white text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Save PIN
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -277,255 +159,343 @@ const PrivacySettings = ({ onBack }) => {
     );
   }
 
-  // ================= MAIN PRIVACY SCREEN (Matching Screenshots 1 & 2 Exactly) =================
+  // ================= BLOCKED CONTACTS SUB-VIEW =================
+  if (subView === "blocked") {
+    return (
+      <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
+        <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
+          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-bold text-slate-100">Blocked contacts</h2>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          {blockedList.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 space-y-2">
+              <UserX className="w-10 h-10 mx-auto text-slate-500" />
+              <p className="text-sm font-medium text-slate-300">No blocked contacts</p>
+              <p className="text-xs text-slate-500">Blocked contacts will no longer be able to call you or send you messages.</p>
+            </div>
+          ) : (
+            blockedList.map((contact) => (
+              <div key={contact.id} className="flex items-center justify-between p-3.5 bg-[#182229] border border-slate-800 rounded-2xl">
+                <span className="text-xs font-semibold text-slate-200">{contact.name}</span>
+                <button
+                  onClick={() => {
+                    setBlockedList(blockedList.filter((c) => c.id !== contact.id));
+                    toast.success("Contact unblocked");
+                  }}
+                  className="text-xs text-rose-400 hover:underline cursor-pointer"
+                >
+                  Unblock
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ================= TERMS & POLICY SUB-VIEWS =================
+  if (subView === "terms" || subView === "privacy_doc") {
+    const isTerms = subView === "terms";
+    return (
+      <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none animate-fade-in">
+        <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
+          <button onClick={() => setSubView(null)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-bold text-slate-100">{isTerms ? "Terms of service" : "Privacy policy"}</h2>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 text-xs text-slate-300 leading-relaxed">
+          <p>
+            <strong>Aryavarta Messenger</strong> is built with end-to-end encryption by default. Your private messages, voice calls, video meetings, and media files are encrypted and cannot be accessed by any third party.
+          </p>
+          <p>
+            We do not sell your personal data or track your communication contents. All security keys are generated on-device.
+          </p>
+          <div className="p-3 bg-[#182229] rounded-xl border border-slate-800 text-slate-400 text-[11px]">
+            Official document version: 2026.4.1 • Verified Secure
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ================= MAIN SCREEN (Exact match of both screenshots 1 & 2) =================
   return (
     <div className="w-full flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border text-slate-100 select-none">
-      {/* 1. Header: ← Privacy */}
+      {/* 1. Top Header: ← Security & privacy */}
       <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
         <button
           onClick={onBack}
-          className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+          className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
           title="Back to Settings"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h2 className="text-lg font-bold text-slate-100">Privacy</h2>
+        <h2 className="text-lg font-bold text-slate-100">Security & privacy</h2>
       </div>
 
-      {/* 2. Scrollable Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6">
-        {/* ================= SECTION 1: Who can see my personal info ================= */}
-        <div className="space-y-1">
-          <span className="text-xs font-semibold text-slate-400 block tracking-wide px-2 pb-1">
-            Who can see my personal info
-          </span>
-
-          {/* Last seen and online */}
-          <div
-            onClick={() => setSubView("last_seen")}
-            className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-          >
-            <div>
-              <span className="text-sm font-medium text-slate-200 block">Last seen and online</span>
-              <span className="text-xs text-slate-400">{lastSeen}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
+      {/* 2. Scrollable Body matching card model */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+        {/* ================= CARD 1: App lock ================= */}
+        <div
+          onClick={() => setSubView("app_lock")}
+          className="p-4 bg-[#182229] hover:bg-[#202c33] border border-slate-800/80 rounded-2xl flex items-center justify-between cursor-pointer transition-colors"
+        >
+          <div>
+            <span className="text-sm font-semibold text-slate-100 block">App lock</span>
+            <span className="text-xs text-slate-400 mt-0.5 block">{appLockEnabled ? "On" : "Off"}</span>
           </div>
-
-          {/* Profile picture */}
-          <div
-            onClick={() => setSubView("profile_pic")}
-            className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-          >
-            <div>
-              <span className="text-sm font-medium text-slate-200 block">Profile picture</span>
-              <span className="text-xs text-slate-400">{profilePic}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </div>
-
-          {/* About */}
-          <div
-            onClick={() => setSubView("about")}
-            className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-          >
-            <div>
-              <span className="text-sm font-medium text-slate-200 block">About</span>
-              <span className="text-xs text-slate-400">{about}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </div>
-
-          {/* Status */}
-          <div
-            onClick={() => setSubView("status")}
-            className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-          >
-            <div>
-              <span className="text-sm font-medium text-slate-200 block">Status</span>
-              <span className="text-xs text-slate-400">{status}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </div>
-
-          {/* Read receipts */}
-          <div className="flex items-start justify-between p-2.5 pt-3">
-            <div className="pr-4">
-              <span className="text-sm font-medium text-slate-200 block">Read receipts</span>
-              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                If turned off, you won't send or receive read receipts. Read receipts are always sent for group chats.
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-              <input
-                type="checkbox"
-                checked={readReceipts}
-                onChange={(e) => {
-                  setReadReceipts(e.target.checked);
-                  toast(e.target.checked ? "Read receipts enabled (blue ticks)" : "Read receipts disabled");
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a884]"></div>
-            </label>
-          </div>
+          <ChevronRight className="w-4 h-4 text-slate-500" />
         </div>
 
-        {/* ================= SECTION 2: Disappearing messages ================= */}
-        <div className="space-y-1 pt-2 border-t border-slate-800">
-          <span className="text-xs font-semibold text-slate-400 block tracking-wide px-2 pb-1">
-            Disappearing messages
-          </span>
-
-          {/* Default message timer */}
-          <div
-            onClick={() => setSubView("timer")}
-            className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-          >
-            <div>
-              <span className="text-sm font-medium text-slate-200 block">Default message timer</span>
-              <span className="text-xs text-slate-400">{defaultTimer}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </div>
-
-          {/* Groups */}
-          <div
-            onClick={() => {
-              const next = groups === "Everyone" ? "My contacts" : "Everyone";
-              setGroups(next);
-              toast.success(`Group invitations set to ${next}`);
-            }}
-            className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
-          >
-            <div>
-              <span className="text-sm font-medium text-slate-200 block">Groups</span>
-              <span className="text-xs text-slate-400">{groups}</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </div>
-
+        {/* ================= CARD 2: Granular Privacy List ================= */}
+        <div className="bg-[#182229] border border-slate-800/80 rounded-2xl divide-y divide-slate-800/60 overflow-hidden">
           {/* Blocked contacts */}
           <div
             onClick={() => setSubView("blocked")}
-            className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
           >
             <div>
-              <span className="text-sm font-medium text-slate-200 block">Blocked contacts</span>
-              <span className="text-xs text-slate-400">{blockedCount}</span>
+              <span className="text-sm font-semibold text-slate-100 block">Blocked contacts</span>
+              <span className="text-xs text-slate-400 mt-0.5 block">
+                {blockedList.length === 0 ? "Nobody" : `${blockedList.length} contacts`}
+              </span>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </div>
 
-          {/* App lock */}
+          {/* Phone number */}
           <div
-            onClick={() => setSubView("app_lock")}
-            className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#202c33] cursor-pointer transition-colors"
+            onClick={() => setSubView("phone")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
           >
             <div>
-              <span className="text-sm font-medium text-slate-200 block">App lock</span>
-              <span className="text-xs text-slate-400">
-                {appLockEnabled ? "Enabled (PIN required)" : "Require password to unlock Aryavarta"}
-              </span>
+              <span className="text-sm font-semibold text-slate-100 block">Phone number</span>
+              <span className="text-xs text-slate-400 mt-0.5 block">{phoneNumberVisibility}</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </div>
+
+          {/* Last seen & online */}
+          <div
+            onClick={() => setSubView("last_seen")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div>
+              <span className="text-sm font-semibold text-slate-100 block">Last seen & online</span>
+              <span className="text-xs text-slate-400 mt-0.5 block">{lastSeenVisibility}</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </div>
+
+          {/* New chat */}
+          <div
+            onClick={() => setSubView("new_chat")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div>
+              <span className="text-sm font-semibold text-slate-100 block">New chat</span>
+              <span className="text-xs text-slate-400 mt-0.5 block">{newChatVisibility}</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </div>
+
+          {/* Calls */}
+          <div
+            onClick={() => setSubView("calls")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div>
+              <span className="text-sm font-semibold text-slate-100 block">Calls</span>
+              <span className="text-xs text-slate-400 mt-0.5 block">{callsVisibility}</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </div>
+
+          {/* Meetings */}
+          <div
+            onClick={() => setSubView("meetings")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div>
+              <span className="text-sm font-semibold text-slate-100 block">Meetings</span>
+              <span className="text-xs text-slate-400 mt-0.5 block">{meetingsVisibility}</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </div>
+
+          {/* Add to groups */}
+          <div
+            onClick={() => setSubView("groups")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div>
+              <span className="text-sm font-semibold text-slate-100 block">Add to groups</span>
+              <span className="text-xs text-slate-400 mt-0.5 block">{groupsVisibility}</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </div>
+
+          {/* Profile photo */}
+          <div
+            onClick={() => setSubView("profile")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div>
+              <span className="text-sm font-semibold text-slate-100 block">Profile photo</span>
+              <span className="text-xs text-slate-400 mt-0.5 block">{profilePhotoVisibility}</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </div>
+
+          {/* Stories */}
+          <div
+            onClick={() => setSubView("stories")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div>
+              <span className="text-sm font-semibold text-slate-100 block">Stories</span>
+              <span className="text-xs text-slate-400 mt-0.5 block">{storiesVisibility}</span>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </div>
         </div>
 
-        {/* ================= SECTION 3: Advanced (Matching Screenshot 2) ================= */}
-        <div className="space-y-3 pt-2 border-t border-slate-800">
-          <span className="text-xs font-semibold text-slate-400 block tracking-wide px-2 pb-1">
-            Advanced
-          </span>
+        {/* ================= CARD 3: Read receipts ================= */}
+        <div className="p-4 bg-[#182229] border border-slate-800/80 rounded-2xl flex items-start justify-between">
+          <div className="pr-4">
+            <span className="text-sm font-semibold text-slate-100 block">Read receipts</span>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Message sent and received will display a double tick and the message read time.
+            </p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
+            <input
+              type="checkbox"
+              checked={readReceipts}
+              onChange={(e) => {
+                setReadReceipts(e.target.checked);
+                toast(e.target.checked ? "Read receipts enabled" : "Read receipts disabled");
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5c7cd8]"></div>
+          </label>
+        </div>
 
-          {/* 1. Block unknown account messages */}
-          <div className="flex items-start justify-between p-2.5">
+        {/* ================= CARD 4: Sync contacts ================= */}
+        <div className="p-4 bg-[#182229] border border-slate-800/80 rounded-2xl flex items-start justify-between">
+          <div className="pr-4">
+            <span className="text-sm font-semibold text-slate-100 block">Sync contacts</span>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Once turned off, any contacts you add to the device will no longer sync with the Aryavarta server.
+            </p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
+            <input
+              type="checkbox"
+              checked={syncContacts}
+              onChange={(e) => {
+                setSyncContacts(e.target.checked);
+                toast(e.target.checked ? "Contacts sync enabled" : "Contacts sync paused");
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5c7cd8]"></div>
+          </label>
+        </div>
+
+        {/* ================= CARD 5: Screen security ================= */}
+        <div className="p-4 bg-[#182229] border border-slate-800/80 rounded-2xl flex items-start justify-between">
+          <div className="pr-4">
+            <span className="text-sm font-semibold text-slate-100 block">Screen security</span>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Prevents Aryavarta content from appearing in the app switcher.
+            </p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
+            <input
+              type="checkbox"
+              checked={screenSecurity}
+              onChange={(e) => {
+                setScreenSecurity(e.target.checked);
+                toast(e.target.checked ? "Screen security enabled" : "Screen security disabled");
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5c7cd8]"></div>
+          </label>
+        </div>
+
+        {/* ================= CARD 6: Protect IP address in calls ================= */}
+        <div className="p-4 bg-[#182229] border border-slate-800/80 rounded-2xl flex items-start justify-between">
+          <div className="pr-4">
+            <span className="text-sm font-semibold text-slate-100 block">Protect IP address in calls</span>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Relay all calls through the Aryavarta server to mask your IP address. Enabling this may reduce call quality.
+            </p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
+            <input
+              type="checkbox"
+              checked={protectIP}
+              onChange={(e) => {
+                setProtectIP(e.target.checked);
+                toast(e.target.checked ? "IP relay protection enabled 🛡️" : "Direct P2P calls enabled");
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5c7cd8]"></div>
+          </label>
+        </div>
+
+        {/* ================= CARD 7: Diagnostics ================= */}
+        <div className="p-4 bg-[#182229] border border-slate-800/80 rounded-2xl space-y-2">
+          <span className="text-xs font-semibold text-slate-400 block">Diagnostics</span>
+          <div className="flex items-start justify-between">
             <div className="pr-4">
-              <span className="text-sm font-medium text-slate-200 block">
-                Block unknown account messages
-              </span>
-              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                To protect your account and improve device performance, Aryavarta will block messages from unknown accounts if they exceed a certain volume.{" "}
-                <button
-                  onClick={() => toast("Learn more about unknown account blocking")}
-                  className="text-emerald-400 hover:text-emerald-300 underline"
-                >
-                  Learn more
-                </button>
+              <span className="text-sm font-semibold text-slate-100 block">Share diagnostic data</span>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Send debug logs, crash reports, and critical failure information to help identify and fix issues.
               </p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
+            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
               <input
                 type="checkbox"
-                checked={blockUnknown}
+                checked={shareDiagnostics}
                 onChange={(e) => {
-                  setBlockUnknown(e.target.checked);
-                  toast(e.target.checked ? "Block unknown messages enabled" : "Disabled");
+                  setShareDiagnostics(e.target.checked);
+                  toast(e.target.checked ? "Diagnostic sharing enabled" : "Diagnostic sharing disabled");
                 }}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a884]"></div>
+              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5c7cd8]"></div>
             </label>
           </div>
+        </div>
 
-          {/* 2. Protect IP address in calls */}
-          <div className="flex items-start justify-between p-2.5">
-            <div className="pr-4">
-              <span className="text-sm font-medium text-slate-200 block">
-                Protect IP address in calls
-              </span>
-              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                To make it harder for people to infer your location, calls on this device will be securely relayed through Aryavarta servers. This will reduce call quality.{" "}
-                <button
-                  onClick={() => toast("Learn more about IP relay protection")}
-                  className="text-emerald-400 hover:text-emerald-300 underline"
-                >
-                  Learn more
-                </button>
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-              <input
-                type="checkbox"
-                checked={protectIP}
-                onChange={(e) => {
-                  setProtectIP(e.target.checked);
-                  toast(e.target.checked ? "Protect IP in calls enabled" : "Disabled");
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a884]"></div>
-            </label>
+        {/* ================= CARD 8: Terms & Privacy Policies ================= */}
+        <div className="bg-[#182229] border border-slate-800/80 rounded-2xl divide-y divide-slate-800/60 overflow-hidden mb-6">
+          <div
+            onClick={() => setSubView("terms")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <span className="text-sm font-semibold text-slate-100">Terms of service</span>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
           </div>
 
-          {/* 3. Turn off link previews */}
-          <div className="flex items-start justify-between p-2.5">
-            <div className="pr-4">
-              <span className="text-sm font-medium text-slate-200 block">
-                Turn off link previews
-              </span>
-              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                To help protect your IP address from being inferred by third-party websites, previews for the links you share in chats will no longer be generated.{" "}
-                <button
-                  onClick={() => toast("Learn more about link previews privacy")}
-                  className="text-emerald-400 hover:text-emerald-300 underline"
-                >
-                  Learn more
-                </button>
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-              <input
-                type="checkbox"
-                checked={turnOffPreviews}
-                onChange={(e) => {
-                  setTurnOffPreviews(e.target.checked);
-                  toast(e.target.checked ? "Link previews turned off" : "Link previews enabled");
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a884]"></div>
-            </label>
+          <div
+            onClick={() => setSubView("privacy_doc")}
+            className="p-3.5 hover:bg-[#202c33] flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <span className="text-sm font-semibold text-slate-100">Privacy policy</span>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
           </div>
         </div>
       </div>

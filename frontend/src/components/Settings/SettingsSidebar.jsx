@@ -12,7 +12,8 @@ import {
   HelpCircle,
   Search,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles
 } from "lucide-react";
 
 const SETTINGS_CATEGORIES = [
@@ -21,6 +22,7 @@ const SETTINGS_CATEGORIES = [
   { id: "account", label: "Account", desc: "Security notifications, account info", icon: KeyRound },
   { id: "privacy", label: "Privacy", desc: "Blocked contacts, disappearing messages, lock", icon: Lock },
   { id: "chats", label: "Chats", desc: "Theme, wallpaper, chat settings", icon: MessageSquare },
+  { id: "ai_voice", label: "AI Voice & Personality", desc: "Arya, Chanakya, voice models & speech", icon: Sparkles },
   { id: "voice", label: "Video & voice", desc: "Camera, microphone & speakers", icon: Video },
   { id: "notifications", label: "Notifications", desc: "Messages, groups, sounds", icon: Bell },
   { id: "shortcuts", label: "Keyboard shortcuts", desc: "Quick navigation hotkeys", icon: Keyboard },
@@ -38,7 +40,7 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory }) => {
   );
 
   return (
-    <aside className="w-full md:w-80 lg:w-[350px] flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border">
+    <aside className="w-full md:w-80 lg:w-[350px] flex flex-col h-full min-h-0 bg-[#111b21] border-r border-slate-800/80 z-10 box-border select-none">
       {/* Settings Header */}
       <div className="px-4 pt-4 pb-2 flex-shrink-0">
         <h1 className="text-xl font-bold text-slate-100 tracking-tight mb-3">Settings</h1>
@@ -98,7 +100,7 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory }) => {
               <div
                 className={`p-2 rounded-xl flex items-center justify-center flex-shrink-0 ${
                   isSelected
-                    ? "bg-emerald-500/20 text-emerald-400"
+                    ? "bg-[#5c7cd8]/20 text-[#5c7cd8]"
                     : "bg-slate-800/60 text-slate-400 group-hover:text-slate-200"
                 }`}
               >
@@ -111,7 +113,7 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory }) => {
               </div>
 
               {isSelected && (
-                <div className="w-1.5 h-6 bg-emerald-500 rounded-full flex-shrink-0" />
+                <div className="w-1.5 h-6 bg-[#5c7cd8] rounded-full flex-shrink-0" />
               )}
             </div>
           );

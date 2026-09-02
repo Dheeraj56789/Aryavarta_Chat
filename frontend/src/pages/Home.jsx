@@ -8,6 +8,7 @@ import EditProfileView from "../components/Settings/EditProfileView";
 import AccountSettings from "../components/Settings/AccountSettings";
 import PrivacySettings from "../components/Settings/PrivacySettings";
 import ChatsSettings from "../components/Settings/ChatsSettings";
+import AIPersonalitySettings from "../components/Settings/AIPersonalitySettings";
 import VoiceSettings from "../components/Settings/VoiceSettings";
 import NotificationsSettings from "../components/Settings/NotificationsSettings";
 import KeyboardShortcutsSettings from "../components/Settings/KeyboardShortcutsSettings";
@@ -16,6 +17,7 @@ import MeetingsView from "../components/Meetings/MeetingsView";
 import ChatContainer from "../components/Chat/ChatContainer";
 import NoChatSelected from "../components/Chat/NoChatSelected";
 import AIChatView from "../components/AI/AIChatView";
+import VoiceAssistantModal from "../components/AI/VoiceAssistantModal";
 import ProfileModal from "../components/Modals/ProfileModal";
 import CallsModal from "../components/Modals/CallsModal";
 import NewGroupModal from "../components/Modals/NewGroupModal";
@@ -30,14 +32,18 @@ const Home = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showCallsModal, setShowCallsModal] = useState(false);
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
+  const [showVoiceAssistantModal, setShowVoiceAssistantModal] = useState(false);
 
   const handleNavChange = (nav) => {
     setActiveNav(nav);
     if (nav === "settings") {
       setSettingsCategory(null);
+    } else if (nav === "privacy") {
+      setActiveNav("settings");
+      setSettingsCategory("privacy");
     } else if (nav === "calls") {
       setShowCallsModal(true);
-    } else if (nav === "status") {
+    } else if (nav === "status" || nav === "stories") {
       toast("Status & Stories: No updates yet", { icon: "📻" });
     } else if (nav === "communities") {
       setShowNewGroupModal(true);
@@ -77,6 +83,8 @@ const Home = () => {
         return <PrivacySettings onBack={handleBack} />;
       case "chats":
         return <ChatsSettings onBack={handleBack} />;
+      case "ai_voice":
+        return <AIPersonalitySettings onBack={handleBack} />;
       case "voice":
         return <VoiceSettings onBack={handleBack} />;
       case "notifications":
@@ -96,7 +104,7 @@ const Home = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-[#0c1317] text-slate-100 overflow-hidden relative box-border">
+    <div className="flex h-screen w-screen bg-[#0c1317] text-slate-100 overflow-hidden relative box-border select-none">
       {/* App Lock Screen */}
       {isAppLocked && (
         <AppLockModal onUnlock={() => setIsAppLocked(false)} expectedPin="1234" />
@@ -107,6 +115,7 @@ const Home = () => {
         activeNav={activeNav}
         setActiveNav={handleNavChange}
         onOpenProfile={handleOpenProfileSettings}
+        onOpenVoiceAssistant={() => setShowVoiceAssistantModal(true)}
       />
 
       {/* 2. Main Workspace Layout */}
@@ -159,7 +168,10 @@ const Home = () => {
               }`}
             >
               {isAIActive ? (
-                <AIChatView />
+                <AIChatView
+                  onNavigate={handleNavChange}
+                  onLockApp={() => setIsAppLocked(true)}
+                />
               ) : selectedConversation ? (
                 <ChatContainer />
               ) : (
@@ -173,7 +185,17 @@ const Home = () => {
         )}
       </div>
 
-      {/* Modals */}
+      {/* Voice Assistant Glowing Orb Modal */}
+      {showVoiceAssistantModal && (
+        <VoiceAssistantModal
+          onClose={() => setShowVoiceAssistantModal(false)}
+          onNavigate={handleNavChange}
+          onLockApp={() => setIsAppLocked(true)}
+          onOpenAIChat={handleSelectAI}
+        />
+      )}
+
+      {/* Other Modals */}
       {showProfileModal && (
         <ProfileModal onClose={() => setShowProfileModal(false)} />
       )}

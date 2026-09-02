@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 import { useChatContext } from "../../context/ChatContext";
+import AIPersonalitySettings from "./AIPersonalitySettings";
 import {
   ShieldCheck,
   Lock,
@@ -70,6 +71,11 @@ const SettingsDetailView = ({ activeCategory }) => {
 
       {/* Content Body */}
       <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
+        {/* ================= AI VOICE & PERSONALITY ================= */}
+        {activeCategory === "ai_voice" && (
+          <AIPersonalitySettings onBack={() => {}} />
+        )}
+
         {/* ================= GENERAL ================= */}
         {activeCategory === "general" && (
           <div className="space-y-6 max-w-xl">

@@ -31,7 +31,6 @@ export const AuthContextProvider = ({ children }) => {
           setAuthUser(updatedUser);
           localStorage.setItem("chat-user", JSON.stringify(updatedUser));
         } else if (res.status === 401) {
-          // Token expired or logged out
           setAuthUser(null);
           localStorage.removeItem("chat-user");
         }
@@ -45,59 +44,182 @@ export const AuthContextProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
-  const login = async (identifier, password) => {
+  // 1. Phone OTP Dispatch (Zero OTP exposure)
+  const sendPhoneOTP = async (phone, purpose = "signup") => {
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/phone/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: identifier, password })
+        body: JSON.stringify({ phone, purpose })
       });
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to log in");
+        throw new Error(data.message || "Failed to send SMS verification code");
+      }
+
+      toast.success(data.message || `Verification code sent via SMS to ${phone} 📲`, {
+        duration: 5000,
+        icon: "📲"
+      });
+      return { success: true, isExistingUser: data.isExistingUser };
+    } catch (err) {
+      toast.error(err.message || "Could not send SMS verification code");
+      return { success: false, message: err.message };
+    }
+  };
+
+  // 2. Phone OTP Verification
+  const verifyPhoneOTP = async (phone, otp, purpose = "signup") => {
+    try {
+      const res = await fetch("/api/auth/phone/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, otp, purpose })
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Phone verification failed");
+      }
+
+      toast.success(data.message || "Phone number verified successfully! ✅");
+      return { success: true, phone_token: data.phone_token };
+    } catch (err) {
+      toast.error(err.message || "Invalid phone OTP code");
+      return { success: false, message: err.message };
+    }
+  };
+
+  // 3. Email OTP Dispatch (Zero OTP exposure)
+  const sendEmailOTP = async (email, purpose = "signup") => {
+    try {
+      const res = await fetch("/api/auth/email/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, purpose })
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to send email verification code");
+      }
+
+      toast.success(data.message || `Verification code sent to ${email} ✉️`, {
+        duration: 5000,
+        icon: "✉️"
+      });
+      return { success: true, isExistingUser: data.isExistingUser };
+    } catch (err) {
+      toast.error(err.message || "Could not send email verification code");
+      return { success: false, message: err.message };
+    }
+  };
+
+  // 4. Email OTP Verification
+  const verifyEmailOTP = async (email, otp, purpose = "signup") => {
+    try {
+      const res = await fetch("/api/auth/email/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp, purpose })
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Email verification failed");
+      }
+
+      toast.success(data.message || "Email address verified successfully! ✅");
+      return { success: true, email_token: data.email_token };
+    } catch (err) {
+      toast.error(err.message || "Invalid email OTP code");
+      return { success: false, message: err.message };
+    }
+  };
+
+  // 5. Final Account Registration (Validates Phone + Email verification tokens)
+  const registerAccount = async (payload) => {
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Account creation failed");
+      }
+
+      const userData = { ...data.user, token: data.token };
+      setAuthUser(userData);
+      localStorage.setItem("chat-user", JSON.stringify(userData));
+      toast.success("Account created & verified successfully! Welcome to Aryavarta 🚀");
+      return { success: true, user: userData };
+    } catch (err) {
+      toast.error(err.message || "Registration failed");
+      return { success: false, message: err.message };
+    }
+  };
+
+  // 6. Login OTP Dispatch (Phone or Email)
+  const sendLoginOTP = async (identifier) => {
+    try {
+      const res = await fetch("/api/auth/login/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier })
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        if (data.isNewUser) {
+          return { success: false, isNewUser: true, message: data.message };
+        }
+        throw new Error(data.message || "Failed to send verification code");
+      }
+
+      toast.success(data.message || `Verification code sent to ${identifier} 📲`, {
+        duration: 5000,
+        icon: "📲"
+      });
+      return { success: true, destination_type: data.destination_type };
+    } catch (err) {
+      toast.error(err.message || "Could not send OTP");
+      return { success: false, message: err.message };
+    }
+  };
+
+  // 7. Login OTP Verification
+  const verifyLoginOTP = async (identifier, otp) => {
+    try {
+      const res = await fetch("/api/auth/login/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, otp })
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        if (data.isNewUser) {
+          return { success: false, isNewUser: true, message: data.message };
+        }
+        throw new Error(data.message || "Login verification failed");
       }
 
       const userData = { ...data.user, token: data.token };
       setAuthUser(userData);
       localStorage.setItem("chat-user", JSON.stringify(userData));
       toast.success(`Welcome back, ${data.user.fullname}! ✨`);
-      return true;
+      return { success: true, user: userData };
     } catch (err) {
-      toast.error(err.message || "Login failed");
-      return false;
+      toast.error(err.message || "Invalid verification code");
+      return { success: false, message: err.message };
     }
   };
 
-  const signup = async ({ fullname, username, email, phone, gender, password, confirmPassword }) => {
-    if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return false;
-    }
-
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullname, username, email, phone, gender, password })
-      });
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Registration failed");
-      }
-
-      const userData = { ...data.user, token: data.token };
-      setAuthUser(userData);
-      localStorage.setItem("chat-user", JSON.stringify(userData));
-      toast.success("Account created successfully with verified details! 🎉");
-      return true;
-    } catch (err) {
-      toast.error(err.message || "Signup failed");
-      return false;
-    }
-  };
-
+  // Logout
   const logout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -110,14 +232,27 @@ export const AuthContextProvider = ({ children }) => {
     }
   };
 
+  // Compatibility forwards
+  const sendOTP = sendLoginOTP;
+  const verifyOTPLogin = verifyLoginOTP;
+  const signupVerified = registerAccount;
+
   return (
     <AuthContext.Provider
       value={{
         authUser,
         setAuthUser,
         isLoading,
-        login,
-        signup,
+        sendPhoneOTP,
+        verifyPhoneOTP,
+        sendEmailOTP,
+        verifyEmailOTP,
+        registerAccount,
+        sendLoginOTP,
+        verifyLoginOTP,
+        sendOTP,
+        verifyOTPLogin,
+        signupVerified,
         logout
       }}
     >

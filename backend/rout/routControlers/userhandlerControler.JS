@@ -90,3 +90,38 @@ export const getAllUsers = async (req, res) => {
         });
     }
 };
+
+export const updateAIPreferences = async (req, res) => {
+    try {
+        const currentUserID = req.user._id;
+        const { personality, voiceURI, voiceLanguage, voicePitch, voiceRate, autoSpeak, wakeWord } = req.body;
+
+        const updatedUser = await User.findByIdAndUpdate(
+            currentUserID,
+            {
+                $set: {
+                    "aiPreferences.personality": personality || "arya",
+                    "aiPreferences.voiceURI": voiceURI || "default",
+                    "aiPreferences.voiceLanguage": voiceLanguage || "en-US",
+                    "aiPreferences.voicePitch": voicePitch !== undefined ? Number(voicePitch) : 1.0,
+                    "aiPreferences.voiceRate": voiceRate !== undefined ? Number(voiceRate) : 1.0,
+                    "aiPreferences.autoSpeak": autoSpeak !== undefined ? Boolean(autoSpeak) : true,
+                    "aiPreferences.wakeWord": wakeWord !== undefined ? Boolean(wakeWord) : false
+                }
+            },
+            { new: true }
+        ).select("-password");
+
+        return res.status(200).json({
+            success: true,
+            message: "AI Voice preferences updated successfully",
+            aiPreferences: updatedUser.aiPreferences
+        });
+    } catch (error) {
+        console.error("Error in updateAIPreferences:", error.message);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to update AI preferences"
+        });
+    }
+};
