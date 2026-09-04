@@ -30,7 +30,7 @@ const COUNTRY_CODES = [
 ];
 
 const Login = () => {
-  const [loginMode, setLoginMode] = useState("qr"); // "qr" | "phone"
+  const [loginMode, setLoginMode] = useState("otp"); // "otp" (default) | "qr"
   const [otpSent, setOtpSent] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(true);
   const [qrDataUrl, setQrDataUrl] = useState("");
@@ -38,6 +38,7 @@ const Login = () => {
   const [resendCountdown, setResendCountdown] = useState(0);
 
   // Pure OTP Phone & Email Login
+  const [authMethod, setAuthMethod] = useState("email"); // "email" | "phone"
   const [countryCode, setCountryCode] = useState("+91");
   const [phoneOrEmail, setPhoneOrEmail] = useState("");
   const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
@@ -46,9 +47,10 @@ const Login = () => {
   const { sendOTP, verifyOTPLogin } = useAuthContext();
   const navigate = useNavigate();
 
-  // Load genuine QR code
+  // Load genuine QR code with real origin URL
   const loadLoginQR = async () => {
-    const sessionToken = `https://aryavarta.app/auth/qr?token=ary_login_${Math.random().toString(36).substring(2, 10)}_${Date.now()}`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:5173";
+    const sessionToken = `${origin}/login?qr_session=ary_login_${Math.random().toString(36).substring(2, 10)}_${Date.now()}`;
     const url = await generateQRCodeDataUrl(sessionToken, {
       width: 280,
       margin: 1,
@@ -81,21 +83,27 @@ const Login = () => {
   // Clean identifier
   const getFullIdentifier = () => {
     const raw = phoneOrEmail.trim();
-    if (raw.includes("@")) return raw.toLowerCase();
+    if (authMethod === "email" || raw.includes("@")) return raw.toLowerCase();
     const cleanDigits = raw.replace(/\D/g, "");
     return `${countryCode}${cleanDigits}`;
   };
 
-  // 1. Send OTP Request with Strict Telecom Validation & 59s Countdown
+  // 1. Send OTP Request with Strict Validation & 59s Countdown
   const handleRequestOTP = async (e) => {
     e?.preventDefault();
     const raw = phoneOrEmail.trim();
     if (!raw) {
-      toast.error("Please enter your mobile phone number or email");
+      toast.error(authMethod === "email" ? "Please enter your registered email address" : "Please enter your mobile phone number");
       return;
     }
 
-    if (!raw.includes("@")) {
+    if (authMethod === "email" || raw.includes("@")) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(raw)) {
+        toast.error("Please enter a valid email address format (e.g. name@example.com)");
+        return;
+      }
+    } else {
       const digits = raw.replace(/\D/g, "");
       if (countryCode === "+91") {
         if (digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits)) {
@@ -173,14 +181,51 @@ const Login = () => {
       <div className="absolute top-0 left-0 right-0 h-44 bg-[#00a884] -z-10 shadow-lg" />
 
       <div className="w-full max-w-[480px] bg-white dark:bg-[#111b21] rounded-3xl shadow-2xl p-6 md:p-8 border border-slate-200 dark:border-slate-800 transition-all text-slate-800 dark:text-slate-100 z-10 box-border">
+        {/* Top-Level Mode Selector: Instant OTP (Default) vs Link with QR Code */}
+        {!otpSent && (
+          <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl gap-1 mb-5">
+            <button
+              type="button"
+              onClick={() => setLoginMode("otp")}
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                loginMode === "otp"
+                  ? "bg-[#00a884] text-white shadow-md shadow-[#00a884]/25"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              <span>Email / Phone OTP</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMode("qr")}
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                loginMode === "qr"
+                  ? "bg-[#00a884] text-white shadow-md shadow-[#00a884]/25"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Link via QR Code</span>
+            </button>
+          </div>
+        )}
+
         {/* ================= MODE 1: QR CODE LOGIN ================= */}
         {loginMode === "qr" ? (
           <div className="flex flex-col items-center animate-fade-in">
+            {/* Helper explanation for phone camera scanners */}
+            <div className="w-full p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-3 text-left">
+              <p className="text-[11px] text-amber-500 dark:text-amber-400 font-medium leading-relaxed">
+                💡 <strong>Scanning Note:</strong> WhatsApp-style QR scanning requires the <em>Aryavarta Mobile App scanner</em> (Settings &gt; Linked devices). On your computer, use the <strong>Email / Phone OTP</strong> tab above, or click the QR code below to simulate instant linking!
+              </p>
+            </div>
+
             {/* Scannable QR Container */}
             <div
               onClick={handleSimulateQRScan}
               className="w-full p-6 bg-slate-100 dark:bg-[#202c33]/70 rounded-2xl border border-slate-200 dark:border-slate-700/60 flex flex-col items-center justify-center cursor-pointer group hover:border-emerald-500 transition-all relative shadow-inner"
-              title="Click or scan QR with phone camera to login instantly"
+              title="Click or scan QR to login instantly"
             >
               <div className="relative p-2.5 bg-white rounded-2xl shadow-xl transition-transform group-hover:scale-105">
                 {qrDataUrl ? (
@@ -199,6 +244,17 @@ const Login = () => {
                 <span>Auto-refreshes in {refreshTimer}s • Click to Link Instantly ⚡</span>
               </div>
             </div>
+
+            {/* Instant Simulate Button */}
+            <button
+              type="button"
+              onClick={handleSimulateQRScan}
+              disabled={loading}
+              className="w-full mt-3 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>⚡ Click Here to Simulate Instant QR Login</span>
+            </button>
 
             {/* Keep me signed in */}
             <div className="w-full flex items-center gap-2.5 mt-5">
@@ -235,13 +291,14 @@ const Login = () => {
             {/* OTP Login Button */}
             <button
               onClick={() => {
-                setLoginMode("phone");
+                setLoginMode("otp");
+                setAuthMethod("email");
                 setOtpSent(false);
               }}
               className="w-full py-3 px-4 rounded-xl border border-slate-300 dark:border-slate-700 hover:border-[#00a884] dark:hover:border-[#00a884] bg-transparent hover:bg-slate-50 dark:hover:bg-[#202c33] text-xs md:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer"
             >
-              <Smartphone className="w-4 h-4 text-[#00a884]" />
-              <span>Sign In with Phone / Email (OTP Login)</span>
+              <Mail className="w-4 h-4 text-[#00a884]" />
+              <span>Use Email / Phone OTP Instead</span>
             </button>
           </div>
         ) : (
@@ -267,24 +324,84 @@ const Login = () => {
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 {otpSent
-                  ? `Enter the 6-digit verification code sent via SMS to ${getFullIdentifier()}`
-                  : "Enter your registered phone number or email to receive an instant OTP"}
+                  ? `Enter the 6-digit verification code sent to ${authMethod === "email" || phoneOrEmail.includes("@") ? "your email" : "your phone"} (${getFullIdentifier()})`
+                  : "Choose Email or Phone to receive your instant login verification code"}
               </p>
             </div>
 
             {!otpSent ? (
               /* Step 1: Input Phone or Email */
               <form onSubmit={handleRequestOTP} className="space-y-4 pt-2">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-                    Phone Number or Email Address
-                  </label>
-                  <div className="flex gap-2">
-                    {!phoneOrEmail.includes("@") && (
+                {/* Method Selector Tabs: Email vs Phone */}
+                <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMethod("email");
+                      setPhoneOrEmail("");
+                    }}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      authMethod === "email"
+                        ? "bg-[#00a884] text-white shadow-md shadow-[#00a884]/25"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span>Email Address</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMethod("phone");
+                      setPhoneOrEmail("");
+                    }}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      authMethod === "phone"
+                        ? "bg-[#00a884] text-white shadow-md shadow-[#00a884]/25"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>Phone Number</span>
+                  </button>
+                </div>
+
+                {authMethod === "email" ? (
+                  /* Email Input */
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span>Registered Email Address</span>
+                      <span className="text-emerald-500 font-normal lowercase">via Resend ✉️</span>
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="email"
+                        value={phoneOrEmail}
+                        onChange={(e) => setPhoneOrEmail(e.target.value)}
+                        required
+                        autoFocus
+                        autoComplete="email"
+                        placeholder="you@example.com"
+                        className="w-full py-2.5 pl-10 pr-3.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#00a884]"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                      We will send an instant 6-digit verification code to your email inbox.
+                    </p>
+                  </div>
+                ) : (
+                  /* Phone Input */
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span>Registered Mobile Phone</span>
+                      <span className="text-emerald-500 font-normal lowercase">via SMS 📲</span>
+                    </label>
+                    <div className="flex gap-2">
                       <select
                         value={countryCode}
                         onChange={(e) => setCountryCode(e.target.value)}
-                        className="py-2.5 px-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#00a884]"
+                        className="py-2.5 px-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#00a884] cursor-pointer"
                       >
                         {COUNTRY_CODES.map((c) => (
                           <option key={c.code} value={c.code}>
@@ -292,18 +409,25 @@ const Login = () => {
                           </option>
                         ))}
                       </select>
-                    )}
-
-                    <input
-                      type="text"
-                      value={phoneOrEmail}
-                      onChange={(e) => setPhoneOrEmail(e.target.value)}
-                      required
-                      autoFocus
-                      className="flex-1 py-2.5 px-3.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#00a884] font-mono"
-                    />
+                      <div className="relative flex-1">
+                        <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                          type="tel"
+                          value={phoneOrEmail}
+                          onChange={(e) => setPhoneOrEmail(e.target.value.replace(/\D/g, ""))}
+                          required
+                          maxLength={10}
+                          autoFocus
+                          placeholder="9876543210"
+                          className="w-full py-2.5 pl-10 pr-3.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#00a884] font-mono"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                      We will send an instant 6-digit verification code via SMS to your phone.
+                    </p>
                   </div>
-                </div>
+                )}
 
                 <button
                   type="submit"

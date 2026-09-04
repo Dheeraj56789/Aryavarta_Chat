@@ -26,7 +26,8 @@ import toast from "react-hot-toast";
 
 const Home = () => {
   const { selectedConversation, setSelectedConversation } = useChatContext();
-  const [activeNav, setActiveNav] = useState("chats"); // "chats" | "meetings" | "ai" | "calls" | "status" | "communities" | "starred" | "settings"
+  const isMeetUrl = window.location.pathname.startsWith("/meet") || new URLSearchParams(window.location.search).has("meet");
+  const [activeNav, setActiveNav] = useState(isMeetUrl ? "meetings" : "chats"); // "chats" | "meetings" | "ai" | "calls" | "status" | "communities" | "starred" | "settings"
   const [settingsCategory, setSettingsCategory] = useState(null); // null (shows menu) or "general", "profile", "account", etc.
   const [isAppLocked, setIsAppLocked] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);

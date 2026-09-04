@@ -28,6 +28,14 @@ const otpVerificationSchema = new mongoose.Schema(
             default: 0,
             max: 5
         },
+        request_count: {
+            type: Number,
+            default: 1
+        },
+        window_start: {
+            type: Date,
+            default: Date.now
+        },
         last_sent_at: {
             type: Date,
             default: Date.now

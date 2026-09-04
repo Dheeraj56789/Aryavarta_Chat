@@ -17,9 +17,8 @@ const userSchema = new mongoose.Schema(
         },
         email: {
             type: String,
-            required: false,
+            required: true,
             unique: true,
-            sparse: true,
             trim: true,
             lowercase: true
         },
@@ -29,8 +28,9 @@ const userSchema = new mongoose.Schema(
         },
         phone: {
             type: String,
-            required: true,
+            required: false,
             unique: true,
+            sparse: true,
             trim: true
         },
         phone_verified: {
@@ -104,6 +104,10 @@ const userSchema = new mongoose.Schema(
                 type: String,
                 default: "en-US"
             }
+        },
+        currentSessionId: {
+            type: String,
+            default: null
         }
     },
     { timestamps: true }

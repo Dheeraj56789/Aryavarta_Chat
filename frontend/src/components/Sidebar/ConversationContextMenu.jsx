@@ -19,7 +19,13 @@ import DeleteConfirmModal from "../Modals/DeleteConfirmModal";
 import toast from "react-hot-toast";
 
 const ConversationContextMenu = ({ x, y, user, onClose }) => {
-  const { selectedConversation, setSelectedConversation, conversations, setConversations } = useChatContext();
+  const {
+    selectedConversation,
+    setSelectedConversation,
+    conversations,
+    setConversations,
+    deleteConversation
+  } = useChatContext();
   const menuRef = useRef(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -96,12 +102,18 @@ const ConversationContextMenu = ({ x, y, user, onClose }) => {
   };
 
   // 8. Confirm Delete
-  const handleConfirmDelete = () => {
-    setConversations((prev) => prev.filter((c) => c._id !== user._id));
-    if (selectedConversation?._id === user._id) {
-      setSelectedConversation(null);
+  const handleConfirmDelete = async () => {
+    if (deleteConversation) {
+      await deleteConversation(user._id);
+    } else if (setConversations) {
+      setConversations((prev) =>
+        (prev || []).filter((c) => c && c._id !== user._id && c.conversationId !== user._id)
+      );
+      if (selectedConversation?._id === user._id) {
+        setSelectedConversation(null);
+      }
+      toast.success(`Deleted ${displayName} 🗑️`);
     }
-    toast.success(`Deleted ${displayName} 🗑️`);
     setShowDeleteModal(false);
     onClose();
   };
@@ -115,7 +127,11 @@ const ConversationContextMenu = ({ x, y, user, onClose }) => {
 
   // 10. Confirm Block / Exit
   const handleConfirmBlock = () => {
-    setConversations((prev) => prev.filter((c) => c._id !== user._id));
+    if (setConversations) {
+      setConversations((prev) =>
+        (prev || []).filter((c) => c && c._id !== user._id && c.conversationId !== user._id)
+      );
+    }
     if (selectedConversation?._id === user._id) {
       setSelectedConversation(null);
     }

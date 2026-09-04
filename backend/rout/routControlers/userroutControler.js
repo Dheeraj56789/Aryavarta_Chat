@@ -5,6 +5,8 @@ import OtpVerification from "../../Models/otpVerificationModel.js";
 import jwtToken from "../../utils/jwtwebToken.js";
 import { sendRealSMSOTP, checkProviderVerification } from "../../utils/smsService.js";
 import { sendEmailOTP as dispatchEmailOTP } from "../../utils/emailService.js";
+import { validateEmailWithMxAndDisposable } from "../../utils/emailValidator.js";
+import { emitForceLogout } from "../../socket/socket.js";
 
 // Helper regex validators
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -13,7 +15,7 @@ const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 export const validateRealPhoneNumber = (fullPhone) => {
     if (!fullPhone) return { isValid: false, message: "Mobile phone number is required" };
 
-    const clean = fullPhone.trim().replace(/[\s-]/g, "");
+    const clean = fullPhone.trim().replace(/[\s\-()]/g, "");
 
     // 1. India (+91)
     if (clean.startsWith("+91")) {
@@ -24,7 +26,8 @@ export const validateRealPhoneNumber = (fullPhone) => {
                 message: "Please enter a valid real 10-digit Indian mobile number (must start with 6, 7, 8, or 9)"
             };
         }
-        if (/^(\d)\1{9}$/.test(digits) || digits === "1234567890" || digits === "9876543210") {
+        const isProd = process.env.NODE_ENV === "production";
+        if (isProd && (/^(\d)\1{9}$/.test(digits) || digits === "1234567890")) {
             return {
                 isValid: false,
                 message: "Please enter your real personal mobile number, not a sample or dummy number"
@@ -122,20 +125,45 @@ export const sendPhoneOTP = async (req, res) => {
             });
         }
 
-        // Check 59s Resend Rate-Limiting
+        // Check 59s Resend & 10-minute Window Rate-Limiting
         const recentOtp = await OtpVerification.findOne({
             destination: cleanPhone,
             purpose
         });
 
-        if (recentOtp && recentOtp.last_sent_at) {
-            const timeSinceLast = Date.now() - new Date(recentOtp.last_sent_at).getTime();
-            if (timeSinceLast < 59 * 1000) {
-                const remaining = Math.ceil((59000 - timeSinceLast) / 1000);
-                return res.status(429).json({
-                    success: false,
-                    message: `Please wait ${remaining} seconds before requesting a new OTP.`
-                });
+        const TEN_MINUTES = 10 * 60 * 1000;
+        let requestCount = 1;
+        let windowStart = new Date();
+
+        if (recentOtp) {
+            if (recentOtp.last_sent_at) {
+                const timeSinceLast = Date.now() - new Date(recentOtp.last_sent_at).getTime();
+                if (timeSinceLast < 59 * 1000) {
+                    const remaining = Math.ceil((59000 - timeSinceLast) / 1000);
+                    return res.status(429).json({
+                        success: false,
+                        message: `Please wait ${remaining} seconds before requesting a new OTP.`
+                    });
+                }
+            }
+
+            // Check max 3 OTP sends per phone number per 10 minutes
+            const currentWindowStart = recentOtp.window_start ? new Date(recentOtp.window_start).getTime() : new Date(recentOtp.createdAt || Date.now()).getTime();
+            const windowAge = Date.now() - currentWindowStart;
+
+            if (windowAge < TEN_MINUTES) {
+                if ((recentOtp.request_count || 1) >= 3) {
+                    const waitMinutes = Math.ceil((TEN_MINUTES - windowAge) / 60000);
+                    return res.status(429).json({
+                        success: false,
+                        message: `Too many OTP requests for this phone number. Please wait ${waitMinutes} minute(s) before requesting again.`
+                    });
+                }
+                requestCount = (recentOtp.request_count || 1) + 1;
+                windowStart = new Date(currentWindowStart);
+            } else {
+                requestCount = 1;
+                windowStart = new Date();
             }
         }
 
@@ -153,6 +181,8 @@ export const sendPhoneOTP = async (req, res) => {
                 otp_hash,
                 purpose,
                 attempts: 0,
+                request_count: requestCount,
+                window_start: windowStart,
                 last_sent_at: new Date(),
                 expires_at,
                 verified_at: null,
@@ -175,8 +205,11 @@ export const sendPhoneOTP = async (req, res) => {
 
         return res.status(200).json({
             success: true,
+            isSandbox: smsResult.isSandbox || false,
             provider: smsResult.provider,
-            message: "Verification code sent via SMS to your mobile phone number."
+            message: smsResult.isSandbox
+                ? smsResult.message
+                : "Verification code sent via SMS to your mobile phone number."
         });
     } catch (error) {
         console.error("Error in sendPhoneOTP:", error.message);
@@ -222,12 +255,12 @@ export const verifyPhoneOTP = async (req, res) => {
             });
         }
 
-        // Check failed attempts limit
-        if (record.attempts >= 3) {
+        // Check failed attempts limit (max 5 tries)
+        if (record.attempts >= 5) {
             await OtpVerification.deleteOne({ _id: record._id });
             return res.status(400).json({
                 success: false,
-                message: "Maximum OTP attempts exceeded. Please request a new verification code."
+                message: "Maximum OTP attempts exceeded (5/5). This code has been invalidated. Please request a new verification code."
             });
         }
 
@@ -243,18 +276,21 @@ export const verifyPhoneOTP = async (req, res) => {
         // 2. If not provider-managed, verify against database hashed OTP
         if (providerCheck.isApproved === null) {
             const isBcryptMatch = await bcryptjs.compare(otp.trim(), record.otp_hash);
-            const isDevMasterMatch = otp.trim() === "123456";
+            const isDevMasterMatch =
+                process.env.NODE_ENV === "development" &&
+                process.env.ALLOW_DEV_MASTER_OTP === "true" &&
+                otp.trim() === "123456";
             const isMatch = isBcryptMatch || isDevMasterMatch;
 
             if (!isMatch) {
                 record.attempts += 1;
                 await record.save();
-                const remaining = 3 - record.attempts;
+                const remaining = 5 - record.attempts;
                 if (remaining <= 0) {
                     await OtpVerification.deleteOne({ _id: record._id });
                     return res.status(400).json({
                         success: false,
-                        message: "Too many incorrect attempts. Please request a new OTP code."
+                        message: "Maximum verification attempts exceeded (5/5). This code has been invalidated. Please request a new OTP code."
                     });
                 }
                 return res.status(400).json({
@@ -293,22 +329,24 @@ export const sendEmailOTP = async (req, res) => {
     try {
         const { email, purpose = "signup" } = req.body;
 
-        if (!email || !EMAIL_REGEX.test(email.trim())) {
+        // 1. Strict Validation: Syntax, Disposable Domain Blocking, and DNS MX Resolution
+        const emailValidation = await validateEmailWithMxAndDisposable(email);
+        if (!emailValidation.isValid) {
             return res.status(400).json({
                 success: false,
-                message: "Please enter a valid email address"
+                message: emailValidation.message
             });
         }
-        const cleanEmail = email.trim().toLowerCase();
+        const cleanEmail = emailValidation.cleanEmail;
 
-        // Check if email already belongs to an account
+        // 2. Pre-flight Check: Prevent fake / duplicate accounts (1 Email = 1 Account)
         const existingUser = await User.findOne({ email: cleanEmail });
 
         if (purpose === "signup" && existingUser) {
             return res.status(400).json({
                 success: false,
                 isExistingUser: true,
-                message: "This email is already registered. Please log in."
+                message: "This email address is already registered. Please log in instead."
             });
         }
 
@@ -320,27 +358,51 @@ export const sendEmailOTP = async (req, res) => {
             });
         }
 
-        // 59-Second Cooldown Check
+        // 3. Multi-Tier Rate Limiting: 59-Second Cooldown + 10-Minute Sliding Window (Max 3 sends)
         const recentOtp = await OtpVerification.findOne({
             destination: cleanEmail,
             purpose
         });
 
-        if (recentOtp && recentOtp.last_sent_at) {
-            const timeSinceLast = Date.now() - new Date(recentOtp.last_sent_at).getTime();
-            if (timeSinceLast < 59 * 1000) {
-                const remaining = Math.ceil((59000 - timeSinceLast) / 1000);
-                return res.status(429).json({
-                    success: false,
-                    message: `Please wait ${remaining} seconds before requesting a new OTP.`
-                });
+        const TEN_MINUTES = 10 * 60 * 1000;
+        let requestCount = 1;
+        let windowStart = new Date();
+
+        if (recentOtp) {
+            if (recentOtp.last_sent_at) {
+                const timeSinceLast = Date.now() - new Date(recentOtp.last_sent_at).getTime();
+                if (timeSinceLast < 59 * 1000) {
+                    const remaining = Math.ceil((59000 - timeSinceLast) / 1000);
+                    return res.status(429).json({
+                        success: false,
+                        message: `Please wait ${remaining} seconds before requesting a new OTP.`
+                    });
+                }
+            }
+
+            const currentWindowStart = recentOtp.window_start ? new Date(recentOtp.window_start).getTime() : new Date(recentOtp.createdAt || Date.now()).getTime();
+            const windowAge = Date.now() - currentWindowStart;
+
+            if (windowAge < TEN_MINUTES) {
+                if ((recentOtp.request_count || 1) >= 3) {
+                    const waitMinutes = Math.ceil((TEN_MINUTES - windowAge) / 60000);
+                    return res.status(429).json({
+                        success: false,
+                        message: `Too many OTP requests for this email. Please wait ${waitMinutes} minute(s) before requesting again.`
+                    });
+                }
+                requestCount = (recentOtp.request_count || 1) + 1;
+                windowStart = new Date(currentWindowStart);
+            } else {
+                requestCount = 1;
+                windowStart = new Date();
             }
         }
 
-        // Generate and Hash OTP
+        // 4. Generate and Hash OTP (5-minute TTL)
         const otp = generateSecureOTP();
         const otp_hash = await bcryptjs.hash(otp, 10);
-        const expires_at = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+        const expires_at = new Date(Date.now() + 5 * 60 * 1000);
 
         await OtpVerification.findOneAndUpdate(
             { destination: cleanEmail, purpose },
@@ -350,6 +412,8 @@ export const sendEmailOTP = async (req, res) => {
                 otp_hash,
                 purpose,
                 attempts: 0,
+                request_count: requestCount,
+                window_start: windowStart,
                 last_sent_at: new Date(),
                 expires_at,
                 verified_at: null,
@@ -358,12 +422,22 @@ export const sendEmailOTP = async (req, res) => {
             { upsert: true, returnDocument: "after" }
         );
 
-        // Dispatch Email via provider
-        await dispatchEmailOTP(cleanEmail, otp);
+        // 5. Dispatch Email via Resend or Dev Sandbox
+        const dispatchResult = await dispatchEmailOTP(cleanEmail, otp);
+
+        if (!dispatchResult.success) {
+            return res.status(400).json({
+                success: false,
+                message: dispatchResult.error || "Failed to send email verification code."
+            });
+        }
 
         return res.status(200).json({
             success: true,
-            message: "Verification code sent to your email address."
+            isSandbox: dispatchResult.isSandbox || false,
+            message: dispatchResult.isSandbox
+                ? dispatchResult.message
+                : "Verification code sent to your email address."
         });
     } catch (error) {
         console.error("Error in sendEmailOTP:", error.message);
@@ -393,32 +467,52 @@ export const verifyEmailOTP = async (req, res) => {
             destination_type: "EMAIL"
         });
 
-        if (!record || Date.now() > new Date(record.expires_at).getTime()) {
+        if (!record) {
             return res.status(400).json({
                 success: false,
-                message: "OTP code has expired. Please request a new verification code."
+                message: "No verification code requested for this email or it has expired. Please request a new code."
             });
         }
 
-        if (record.attempts >= 3) {
+        // Check 5-minute TTL
+        if (Date.now() > new Date(record.expires_at).getTime()) {
             await OtpVerification.deleteOne({ _id: record._id });
             return res.status(400).json({
                 success: false,
-                message: "Maximum OTP attempts exceeded. Please request a new verification code."
+                message: "Verification code has expired (5-minute limit). Please request a fresh OTP."
             });
         }
 
-        const isMatch = await bcryptjs.compare(otp.trim(), record.otp_hash);
+        // Check Max Attempt Limit (5 tries)
+        if (record.attempts >= 5) {
+            await OtpVerification.deleteOne({ _id: record._id });
+            return res.status(400).json({
+                success: false,
+                message: "Maximum verification attempts exceeded (5/5). This code has been invalidated. Please request a new OTP code."
+            });
+        }
+
+        // Master bypass gated to explicit dev environment
+        const allowMasterBypass = process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_MASTER_OTP === "true";
+        const isMasterBypass = allowMasterBypass && otp.trim() === "123456";
+
+        let isMatch = false;
+        if (isMasterBypass) {
+            isMatch = true;
+            console.log(`[Email Auth Security] ⚠️ Master OTP bypass used for email: ${cleanEmail}`);
+        } else if (record.otp_hash) {
+            isMatch = await bcryptjs.compare(otp.trim(), record.otp_hash);
+        }
 
         if (!isMatch) {
             record.attempts += 1;
             await record.save();
-            const remaining = 3 - record.attempts;
+            const remaining = 5 - record.attempts;
             if (remaining <= 0) {
                 await OtpVerification.deleteOne({ _id: record._id });
                 return res.status(400).json({
                     success: false,
-                    message: "Too many incorrect attempts. Please request a new OTP code."
+                    message: "Maximum verification attempts exceeded (5/5). This code has been invalidated. Please request a new OTP code."
                 });
             }
             return res.status(400).json({
@@ -427,6 +521,7 @@ export const verifyEmailOTP = async (req, res) => {
             });
         }
 
+        // Generate secure one-time verification token
         const verification_token = crypto.randomBytes(32).toString("hex");
         record.verified_at = new Date();
         record.verification_token = verification_token;
@@ -468,68 +563,84 @@ export const registerUser = async (req, res) => {
             profilepic = ""
         } = req.body;
 
-        if (!fullname || !phone) {
+        if (!fullname) {
             return res.status(400).json({
                 success: false,
-                message: "Full Name and Mobile Phone Number are required"
+                message: "Full Name is required"
             });
         }
 
-        const phoneValidation = validateRealPhoneNumber(phone);
-        if (!phoneValidation.isValid) {
-            return res.status(400).json({
-                success: false,
-                message: phoneValidation.message
-            });
-        }
-        const cleanPhone = phoneValidation.cleanPhone;
-
-        // 1. Verify Phone Token (COMPULSORY)
-        if (!phone_token) {
-            return res.status(400).json({
-                success: false,
-                message: "Please complete Phone Number SMS OTP verification first"
-            });
-        }
-
-        const phoneVerification = await OtpVerification.findOne({
-            destination: cleanPhone,
-            verification_token: phone_token,
-            destination_type: "PHONE"
-        });
-
-        if (!phoneVerification || !phoneVerification.verified_at) {
-            return res.status(400).json({
-                success: false,
-                message: "Phone verification token is invalid or expired. Please verify your phone number."
-            });
-        }
-
-        // 2. Optional Email Handling
+        // 1. Email Verification Check (Primary Requirement: 1 Email = 1 Account)
         let cleanEmail = email ? email.trim().toLowerCase() : null;
-        if (cleanEmail) {
-            if (!EMAIL_REGEX.test(cleanEmail)) {
+        if (!cleanEmail) {
+            return res.status(400).json({
+                success: false,
+                message: "Email address is required"
+            });
+        }
+
+        const emailValidation = await validateEmailWithMxAndDisposable(cleanEmail);
+        if (!emailValidation.isValid) {
+            return res.status(400).json({
+                success: false,
+                message: emailValidation.message
+            });
+        }
+
+        if (!email_token && !phone_token) {
+            return res.status(400).json({
+                success: false,
+                message: "Please complete Email verification code (OTP) first"
+            });
+        }
+
+        const FIFTEEN_MINUTES = 15 * 60 * 1000;
+
+        if (email_token) {
+            const emailVerification = await OtpVerification.findOne({
+                destination: cleanEmail,
+                verification_token: email_token,
+                destination_type: "EMAIL"
+            });
+            if (
+                !emailVerification ||
+                !emailVerification.verified_at ||
+                Date.now() - new Date(emailVerification.verified_at).getTime() > FIFTEEN_MINUTES
+            ) {
                 return res.status(400).json({
                     success: false,
-                    message: "Please enter a valid email address or leave it empty"
-                });
-            }
-            const duplicateEmail = await User.findOne({ email: cleanEmail });
-            if (duplicateEmail) {
-                return res.status(400).json({
-                    success: false,
-                    message: "This email address is already registered. Please use another email or leave it blank."
+                    message: "Email verification session expired or invalid. Please request a fresh OTP."
                 });
             }
         }
 
-        // 3. Database Uniqueness Enforcement (1 Phone = 1 Account)
-        const duplicatePhone = await User.findOne({ phone: cleanPhone });
-        if (duplicatePhone) {
+        // Pre-flight uniqueness check on Email
+        const duplicateEmail = await User.findOne({ email: cleanEmail });
+        if (duplicateEmail) {
             return res.status(400).json({
                 success: false,
-                message: "This phone number is already registered. Please log in instead."
+                message: "This email address is already registered. Please log in instead."
             });
+        }
+
+        // 2. Optional Phone Handling (if provided)
+        let cleanPhone = null;
+        if (phone && phone.trim()) {
+            const phoneValidation = validateRealPhoneNumber(phone);
+            if (!phoneValidation.isValid) {
+                return res.status(400).json({
+                    success: false,
+                    message: phoneValidation.message
+                });
+            }
+            cleanPhone = phoneValidation.cleanPhone;
+            const duplicatePhone = await User.findOne({ phone: cleanPhone });
+            if (duplicatePhone) {
+                return res.status(400).json({
+                    success: false,
+                    message: "This phone number is already linked to another account."
+                });
+            }
         }
 
         // Generate unique username
@@ -551,27 +662,37 @@ export const registerUser = async (req, res) => {
         const newUser = new User({
             fullname: fullname.trim(),
             username: uniqueUsername,
-            email: cleanEmail || undefined, // undefined prevents MongoDB unique constraint duplicate on null
-            email_verified: !!(cleanEmail && email_token),
-            phone: cleanPhone,
-            phone_verified: true,
+            email: cleanEmail,
+            email_verified: !!email_token,
+            phone: cleanPhone || undefined, // undefined prevents unique index conflicts on sparse field
+            phone_verified: !!phone_token,
             gender,
-            country: country.trim() || "India",
-            state: state.trim(),
-            district: district.trim(),
-            pincode: pincode.trim(),
-            about: about.trim() || "Available | Using Aryavarta 🚀",
+            country: country ? country.trim() : "India",
+            state: state ? state.trim() : "",
+            district: district ? district.trim() : "",
+            pincode: pincode ? pincode.trim() : "",
+            about: about ? about.trim() : "Available | Using Aryavarta 🚀",
             profilepic: defaultAvatar
         });
 
+        // 🔒 Generate unique sessionId for single session enforcement
+        const newSessionId = crypto.randomUUID();
+        newUser.currentSessionId = newSessionId;
         await newUser.save();
 
+        console.log(`[SingleSession Backend] Step 1: registerUser created user: ${newUser._id.toString()}`);
+        console.log(`[SingleSession Backend] Step 2: Generated new sessionId: ${newSessionId}`);
+        console.log(`[SingleSession Backend] Step 3: Saved new sessionId to MongoDB for user ${newUser._id.toString()}`);
+        emitForceLogout(newUser._id.toString(), "Your account was logged in from another location.");
+
         // Invalidate OTP tokens to ensure single use
+        const destinationsToClean = [cleanEmail];
+        if (cleanPhone) destinationsToClean.push(cleanPhone);
         await OtpVerification.deleteMany({
-            destination: { $in: [cleanPhone, cleanEmail] }
+            destination: { $in: destinationsToClean }
         });
 
-        const token = jwtToken(newUser._id, res);
+        const token = jwtToken(newUser._id, res, newSessionId);
 
         return res.status(201).json({
             success: true,
@@ -589,18 +710,26 @@ export const registerUser = async (req, res) => {
                 district: newUser.district,
                 pincode: newUser.pincode,
                 profilepic: newUser.profilepic,
-                about: newUser.about
+                about: newUser.about,
+                currentSessionId: newSessionId
             },
             token,
+            sessionId: newSessionId,
             message: "Account created and verified successfully! Welcome to Aryavarta 🚀"
         });
     } catch (error) {
         console.error("Error in registerUser:", error.message);
         if (error.code === 11000) {
             const field = Object.keys(error.keyPattern || {})[0] || "field";
+            if (field === "phone") {
+                return res.status(400).json({
+                    success: false,
+                    message: "This phone number is already linked to another account."
+                });
+            }
             return res.status(400).json({
                 success: false,
-                message: `This ${field === "phone" ? "phone number" : field} is already registered. Please log in.`
+                message: `This ${field} is already registered. Please log in.`
             });
         }
         return res.status(500).json({
@@ -664,20 +793,44 @@ export const sendLoginOTP = async (req, res) => {
             });
         }
 
-        // Check 59s cooldown
+        // Check 59s Resend & 10-Minute Window Rate-Limiting
         const recentOtp = await OtpVerification.findOne({
             destination: cleanKey,
             purpose: "login"
         });
 
-        if (recentOtp && recentOtp.last_sent_at) {
-            const timeSinceLast = Date.now() - new Date(recentOtp.last_sent_at).getTime();
-            if (timeSinceLast < 59 * 1000) {
-                const remaining = Math.ceil((59000 - timeSinceLast) / 1000);
-                return res.status(429).json({
-                    success: false,
-                    message: `Please wait ${remaining} seconds before requesting a new OTP.`
-                });
+        const TEN_MINUTES = 10 * 60 * 1000;
+        let requestCount = 1;
+        let windowStart = new Date();
+
+        if (recentOtp) {
+            if (recentOtp.last_sent_at) {
+                const timeSinceLast = Date.now() - new Date(recentOtp.last_sent_at).getTime();
+                if (timeSinceLast < 59 * 1000) {
+                    const remaining = Math.ceil((59000 - timeSinceLast) / 1000);
+                    return res.status(429).json({
+                        success: false,
+                        message: `Please wait ${remaining} seconds before requesting a new OTP.`
+                    });
+                }
+            }
+
+            const currentWindowStart = recentOtp.window_start ? new Date(recentOtp.window_start).getTime() : new Date(recentOtp.createdAt || Date.now()).getTime();
+            const windowAge = Date.now() - currentWindowStart;
+
+            if (windowAge < TEN_MINUTES) {
+                if ((recentOtp.request_count || 1) >= 3) {
+                    const waitMinutes = Math.ceil((TEN_MINUTES - windowAge) / 60000);
+                    return res.status(429).json({
+                        success: false,
+                        message: `Too many login OTP requests for this ${destination_type === "PHONE" ? "phone number" : "email"}. Please wait ${waitMinutes} minute(s) before trying again.`
+                    });
+                }
+                requestCount = (recentOtp.request_count || 1) + 1;
+                windowStart = new Date(currentWindowStart);
+            } else {
+                requestCount = 1;
+                windowStart = new Date();
             }
         }
 
@@ -693,6 +846,8 @@ export const sendLoginOTP = async (req, res) => {
                 otp_hash,
                 purpose: "login",
                 attempts: 0,
+                request_count: requestCount,
+                window_start: windowStart,
                 last_sent_at: new Date(),
                 expires_at,
                 verified_at: null,
@@ -723,8 +878,11 @@ export const sendLoginOTP = async (req, res) => {
 
         return res.status(200).json({
             success: true,
+            isSandbox: destination_type === "PHONE" ? (smsResult.isSandbox || false) : false,
             destination_type,
-            message: `Verification code sent via ${destination_type === "PHONE" ? "SMS" : "Email"}.`
+            message: destination_type === "PHONE" && smsResult.isSandbox
+                ? smsResult.message
+                : `Verification code sent via ${destination_type === "PHONE" ? "SMS" : "Email"}.`
         });
     } catch (error) {
         console.error("Error in sendLoginOTP:", error.message);
@@ -773,27 +931,30 @@ export const verifyLoginOTP = async (req, res) => {
             });
         }
 
-        if (record.attempts >= 3) {
+        if (record.attempts >= 5) {
             await OtpVerification.deleteOne({ _id: record._id });
             return res.status(400).json({
                 success: false,
-                message: "Maximum verification attempts exceeded. Please request a new code."
+                message: "Maximum verification attempts exceeded (5/5). Please request a new code."
             });
         }
 
         const isBcryptMatch = await bcryptjs.compare(otp.trim(), record.otp_hash);
-        const isDevMasterMatch = otp.trim() === "123456";
+        const isDevMasterMatch =
+            process.env.NODE_ENV === "development" &&
+            process.env.ALLOW_DEV_MASTER_OTP === "true" &&
+            otp.trim() === "123456";
         const isMatch = isBcryptMatch || isDevMasterMatch;
 
         if (!isMatch) {
             record.attempts += 1;
             await record.save();
-            const remaining = 3 - record.attempts;
+            const remaining = 5 - record.attempts;
             if (remaining <= 0) {
                 await OtpVerification.deleteOne({ _id: record._id });
                 return res.status(400).json({
                     success: false,
-                    message: "Too many incorrect attempts. Please request a new OTP code."
+                    message: "Too many incorrect attempts (5/5). Please request a new OTP code."
                 });
             }
             return res.status(400).json({
@@ -817,7 +978,26 @@ export const verifyLoginOTP = async (req, res) => {
         // Clean up OTP
         await OtpVerification.deleteOne({ _id: record._id });
 
-        const token = jwtToken(user._id, res);
+        // =========================================================================
+        // 🔒 SINGLE SESSION ENFORCEMENT
+        // Step 1: User verified
+        // Step 2: Generate new unique session ID
+        // Step 3: Overwrite currentSessionId in MongoDB
+        // Step 4: Emit force-logout to terminate any existing socket session elsewhere
+        // Step 5: Issue new JWT embedding new sessionId
+        // =========================================================================
+        const newSessionId = crypto.randomUUID();
+        user.currentSessionId = newSessionId;
+        await user.save();
+
+        console.log(`[SingleSession Backend] Step 1: Login verified for user: ${user._id.toString()} (${user.email || user.phone})`);
+        console.log(`[SingleSession Backend] Step 2: Generated new sessionId: ${newSessionId}`);
+        console.log(`[SingleSession Backend] Step 3: Saved new sessionId ${newSessionId} to MongoDB for user ${user._id.toString()}`);
+        console.log(`[SingleSession Backend] Step 4: Emitting force-logout to terminate older active sessions...`);
+        emitForceLogout(user._id.toString(), "Your account was logged in from another location.");
+
+        console.log(`[SingleSession Backend] Step 5: Issuing JWT with new sessionId: ${newSessionId}`);
+        const token = jwtToken(user._id, res, newSessionId);
 
         return res.status(200).json({
             success: true,
@@ -835,9 +1015,11 @@ export const verifyLoginOTP = async (req, res) => {
                 district: user.district,
                 pincode: user.pincode,
                 profilepic: user.profilepic,
-                about: user.about
+                about: user.about,
+                currentSessionId: newSessionId
             },
             token,
+            sessionId: newSessionId,
             message: "Logged in successfully! ✨"
         });
     } catch (error) {
@@ -868,8 +1050,12 @@ export const getMe = async (req, res) => {
     }
 };
 
-export const userLogOut = (req, res) => {
+export const userLogOut = async (req, res) => {
     try {
+        if (req.user && req.user._id) {
+            await User.findByIdAndUpdate(req.user._id, { $set: { currentSessionId: null } });
+        }
+
         res.cookie("jwt", "", {
             maxAge: 0,
             httpOnly: true,

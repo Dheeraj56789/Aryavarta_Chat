@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
@@ -8,12 +9,21 @@ import authRouter from "./rout/authUser.js";
 import messageRouter from "./rout/messageRout.js";
 import userRouter from "./rout/userRout.js";
 import aiRouter from "./rout/aiRoute.js";
+import meetingRouter from "./rout/meetingRoute.js";
+import callRouter from "./rout/callRoute.js";
 import { app, server } from "./socket/socket.js";
 
-dotenv.config();
+const __dirname = path.resolve();
+
+// Load .env from root and backend directories seamlessly
+dotenv.config({ path: path.join(__dirname, ".env") });
+dotenv.config({ path: path.join(__dirname, "backend", ".env") });
+
+console.log('ENV CHECK - RESEND_API_KEY length:', (process.env.RESEND_API_KEY || '').length);
+console.log("FAST2SMS_API_KEY loaded:", process.env.FAST2SMS_API_KEY ? "YES (" + process.env.FAST2SMS_API_KEY.length + " chars)" : "NO - UNDEFINED");
+console.log("RESEND_API_KEY loaded:", process.env.RESEND_API_KEY ? "YES (" + process.env.RESEND_API_KEY.length + " chars)" : "NO - UNDEFINED");
 
 const PORT = process.env.PORT || 3000;
-const __dirname = path.resolve();
 
 // Middlewares
 app.use(
@@ -30,6 +40,8 @@ app.use("/api/auth", authRouter);
 app.use("/api/message", messageRouter);
 app.use("/api/user", userRouter);
 app.use("/api/ai", aiRouter);
+app.use("/api/meeting", meetingRouter);
+app.use("/api/calls", callRouter);
 
 // Health check
 app.get("/api/health", (req, res) => {

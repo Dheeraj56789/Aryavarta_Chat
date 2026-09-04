@@ -15,15 +15,15 @@ const Conversations = ({ searchQuery, filterChip, onSelectAI, isAISelected }) =>
 
   const [contextMenu, setContextMenu] = useState(null); // { x, y, user }
 
-  // Combine recent conversations and all contacts
-  const combinedList = conversations.length > 0 ? conversations : allUsers;
+  // Only display actual active conversations where the logged-in user is a participant
+  const listToDisplay = (conversations || []).filter((c) => c && c._id);
 
   // Filter based on search and chip
   const filteredList = (filterChip === "groups"
-    ? combinedList.filter((c) => c.isGroup)
+    ? listToDisplay.filter((c) => c.isGroup)
     : filterChip === "unread"
-    ? combinedList.filter((_, idx) => idx % 2 === 0)
-    : combinedList
+    ? listToDisplay.filter((c) => (c.unreadCount || 0) > 0)
+    : listToDisplay
   ).filter((user) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -103,7 +103,7 @@ const Conversations = ({ searchQuery, filterChip, onSelectAI, isAISelected }) =>
             isSelected={!isAISelected && selectedConversation?._id === user._id}
             onClick={() => setSelectedConversation(user)}
             onContextMenu={(e) => handleContextMenu(e, user)}
-            unreadCount={idx === 1 ? 73 : idx === 2 ? 46 : idx === 3 ? 35 : idx === 4 ? 18 : 0}
+            unreadCount={user.unreadCount || 0}
           />
         ))
       ) : (

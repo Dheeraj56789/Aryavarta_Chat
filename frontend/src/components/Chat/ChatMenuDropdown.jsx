@@ -22,7 +22,13 @@ import { useChatContext } from "../../context/ChatContext";
 import toast from "react-hot-toast";
 
 const ChatMenuDropdown = ({ onClose, onOpenContactInfo, onToggleSelectMode }) => {
-  const { selectedConversation, setSelectedConversation, setMessages, messages } = useChatContext();
+  const {
+    selectedConversation,
+    setSelectedConversation,
+    setMessages,
+    messages,
+    deleteConversation
+  } = useChatContext();
   const [showMuteSubmenu, setShowMuteSubmenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -62,9 +68,13 @@ const ChatMenuDropdown = ({ onClose, onOpenContactInfo, onToggleSelectMode }) =>
     onClose();
   };
 
-  const handleDeleteChat = () => {
-    setSelectedConversation(null);
-    toast.success("Chat deleted 🗑️");
+  const handleDeleteChat = async () => {
+    if (selectedConversation?._id && deleteConversation) {
+      await deleteConversation(selectedConversation._id);
+    } else {
+      setSelectedConversation(null);
+      toast.success("Chat deleted 🗑️");
+    }
     onClose();
   };
 

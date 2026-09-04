@@ -16,11 +16,20 @@ const isLogin = async (req, res, next) => {
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (jwtErr) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: Invalid or expired token"
+            });
+        }
+
         if (!decoded || !decoded.userId) {
             return res.status(401).json({
                 success: false,
-                message: "Unauthorized: Invalid token"
+                message: "Unauthorized: Invalid token payload"
             });
         }
 
@@ -32,7 +41,49 @@ const isLogin = async (req, res, next) => {
             });
         }
 
+        // =========================================================================
+        // 🔒 SINGLE SESSION ENFORCEMENT
+        // If the user's currentSessionId exists in MongoDB and doesn't match the
+        // token's embedded sessionId, a newer login has taken place elsewhere.
+        // =========================================================================
+        if (user.currentSessionId) {
+            if (!decoded.sessionId || user.currentSessionId !== decoded.sessionId) {
+                console.log('Session invalidated for user', user._id.toString(), '- old sessionId no longer matches');
+                console.log(`[SingleSession] Session mismatch for user ${user._id}. Token sessionId: ${decoded.sessionId || 'NONE'}, DB currentSessionId: ${user.currentSessionId}`);
+
+                // Immediately clear the invalidated JWT cookie from the client browser
+                res.cookie("jwt", "", {
+                    maxAge: 0,
+                    httpOnly: true,
+                    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+                    secure: process.env.NODE_ENV === "production"
+                });
+
+                return res.status(401).json({
+                    success: false,
+                    code: "SESSION_EXPIRED_ELSEWHERE",
+                    message: "SESSION_EXPIRED_ELSEWHERE",
+                    reason: "Your account was logged in from another location."
+                });
+            }
+        } else if (user.currentSessionId === null) {
+            // User was previously logged out
+            res.cookie("jwt", "", {
+                maxAge: 0,
+                httpOnly: true,
+                sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+                secure: process.env.NODE_ENV === "production"
+            });
+            return res.status(401).json({
+                success: false,
+                code: "SESSION_EXPIRED_ELSEWHERE",
+                message: "SESSION_EXPIRED_ELSEWHERE",
+                reason: "Session has ended. Please log in again."
+            });
+        }
+
         req.user = user;
+        req.sessionId = decoded.sessionId || user.currentSessionId;
         next();
     } catch (error) {
         console.error("Error in isLogin middleware:", error.message);

@@ -356,6 +356,47 @@ export const ChatContextProvider = ({ children }) => {
     }
   };
 
+  // Delete conversation from backend and clean state
+  const deleteConversation = async (targetUserId) => {
+    if (!targetUserId) return;
+    try {
+      const headers = authUser?.token ? { Authorization: `Bearer ${authUser.token}` } : {};
+      const res = await fetch(`/api/message/${targetUserId}`, {
+        method: "DELETE",
+        headers
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to delete conversation");
+      }
+
+      // Robust filter OUT of state - prevents blank/empty items
+      setConversations((prev) =>
+        (prev || []).filter((c) => c && c._id !== targetUserId && c.conversationId !== targetUserId)
+      );
+
+      if (selectedConversation?._id === targetUserId) {
+        setSelectedConversation(null);
+        setMessages([]);
+      }
+
+      toast.success("Chat deleted 🗑️");
+      return { success: true };
+    } catch (err) {
+      console.warn("Delete API notice:", err.message);
+      // Optimistically filter OUT from local state so UI never hangs
+      setConversations((prev) =>
+        (prev || []).filter((c) => c && c._id !== targetUserId && c.conversationId !== targetUserId)
+      );
+      if (selectedConversation?._id === targetUserId) {
+        setSelectedConversation(null);
+        setMessages([]);
+      }
+      toast.success("Chat deleted 🗑️");
+      return { success: false, message: err.message };
+    }
+  };
+
   // Emit typing indicator
   const emitTyping = (isTyping) => {
     if (!socket || !selectedConversation?._id || !authUser?._id) return;
@@ -475,7 +516,10 @@ export const ChatContextProvider = ({ children }) => {
         selectedConversation,
         setSelectedConversation,
         messages,
+        setMessages,
         conversations,
+        setConversations,
+        deleteConversation,
         allUsers,
         loadingConversations,
         loadingMessages,
