@@ -1,5 +1,5 @@
 import express from "express";
-import { handleAIChat } from "./routControlers/aiController.js";
+import { handleAIChat, handleVoiceCommand } from "./routControlers/aiController.js";
 import jwt from "jsonwebtoken";
 import User from "../Models/userModels.js";
 
@@ -31,5 +31,6 @@ const optionalAuth = async (req, res, next) => {
 };
 
 router.post("/chat", optionalAuth, handleAIChat);
+router.post("/voice-command", optionalAuth, handleVoiceCommand);
 
 export default router;

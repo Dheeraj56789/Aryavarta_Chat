@@ -411,21 +411,25 @@ export const ChatContextProvider = ({ children }) => {
   const executeAutonomousAction = async (action, appHooks = {}) => {
     if (!action || !action.type) return;
 
+    // Helper to resolve contact using direct object or fuzzy matcher
+    const resolveContact = (act) => {
+      if (act.contact) return act.contact;
+      const query = act.targetName || "";
+      const pool = [...conversations, ...allUsers];
+      return pool.find(
+        (c) =>
+          c.fullname.toLowerCase() === query.toLowerCase() ||
+          c.username.toLowerCase() === query.toLowerCase()
+      ) || pool.find(
+        (c) =>
+          c.fullname.toLowerCase().includes(query.toLowerCase()) ||
+          c.username.toLowerCase().includes(query.toLowerCase())
+      );
+    };
+
     switch (action.type) {
       case "OPEN_CHAT": {
-        const query = action.targetName?.toLowerCase() || "";
-        const target =
-          conversations.find(
-            (c) =>
-              c.fullname.toLowerCase().includes(query) ||
-              (c.username && c.username.toLowerCase().includes(query))
-          ) ||
-          allUsers.find(
-            (u) =>
-              u.fullname.toLowerCase().includes(query) ||
-              (u.username && u.username.toLowerCase().includes(query))
-          );
-
+        const target = resolveContact(action);
         if (target) {
           setSelectedConversation(target);
           if (appHooks.onClearAI) appHooks.onClearAI();
@@ -444,19 +448,7 @@ export const ChatContextProvider = ({ children }) => {
       }
 
       case "SEND_MESSAGE": {
-        const query = action.targetName?.toLowerCase() || "";
-        const target =
-          conversations.find(
-            (c) =>
-              c.fullname.toLowerCase().includes(query) ||
-              (c.username && c.username.toLowerCase().includes(query))
-          ) ||
-          allUsers.find(
-            (u) =>
-              u.fullname.toLowerCase().includes(query) ||
-              (u.username && u.username.toLowerCase().includes(query))
-          );
-
+        const target = resolveContact(action);
         if (target) {
           setSelectedConversation(target);
           if (appHooks.onClearAI) appHooks.onClearAI();
@@ -483,6 +475,57 @@ export const ChatContextProvider = ({ children }) => {
           }
         } else {
           toast.error(`Could not find contact "${action.targetName}" to send message`);
+        }
+        break;
+      }
+
+      case "VOICE_CALL": {
+        const target = resolveContact(action);
+        if (target) {
+          setSelectedConversation(target);
+          if (appHooks.onClearAI) appHooks.onClearAI();
+
+          try {
+            const headers = {
+              "Content-Type": "application/json",
+              ...(authUser?.token ? { Authorization: `Bearer ${authUser.token}` } : {})
+            };
+            await fetch("/api/calls", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ receiverId: target._id, callType: "audio", status: "outgoing" })
+            });
+          } catch {}
+
+          soundEffects.playCallerTune("ringing");
+          toast.success(`Calling ${target.fullname}... 📞`);
+        } else {
+          toast.error(`Could not find contact to call`);
+        }
+        break;
+      }
+
+      case "VIDEO_CALL": {
+        const target = resolveContact(action);
+        if (target) {
+          setSelectedConversation(target);
+          if (appHooks.onClearAI) appHooks.onClearAI();
+
+          try {
+            const headers = {
+              "Content-Type": "application/json",
+              ...(authUser?.token ? { Authorization: `Bearer ${authUser.token}` } : {})
+            };
+            await fetch("/api/calls", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ receiverId: target._id, callType: "video", status: "outgoing" })
+            });
+          } catch {}
+
+          toast.success(`Starting video call with ${target.fullname}... 📹`);
+        } else {
+          toast.error(`Could not find contact to video call`);
         }
         break;
       }

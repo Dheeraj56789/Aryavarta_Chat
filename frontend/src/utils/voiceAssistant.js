@@ -1,4 +1,4 @@
-// Frontend Multilingual Voice Assistant Engine (Speech-to-Text & Text-to-Speech)
+// Enhanced Multilingual Voice Assistant Engine (Speech-to-Text & Text-to-Speech)
 
 class VoiceAssistantEngine {
   constructor() {
@@ -6,6 +6,7 @@ class VoiceAssistantEngine {
     this.isListening = false;
     this.isSpeaking = false;
     this.availableVoices = [];
+    this.manualStop = false;
     this.initVoices();
   }
 
@@ -30,22 +31,25 @@ class VoiceAssistantEngine {
     return this.availableVoices;
   }
 
-  // 2. Speech-to-Text (STT) Recognition
-  startListening({ onTranscript, onFinal, onStart, onEnd, onError, language = "en-US" }) {
+  // 2. Speech-to-Text (STT) Recognition using Web Speech API
+  startListening({ onTranscript, onFinal, onStart, onEnd, onError, language = "en-US", continuous = false }) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      if (onError) onError(new Error("Speech recognition is not supported in this browser."));
+      if (onError) onError(new Error("Speech recognition is not supported in this browser. Please use Chrome or Edge."));
       return false;
     }
 
     try {
+      this.manualStop = false;
       if (this.recognition) {
-        this.recognition.abort();
+        try {
+          this.recognition.abort();
+        } catch {}
       }
 
       this.recognition = new SpeechRecognition();
-      this.recognition.continuous = false;
+      this.recognition.continuous = continuous;
       this.recognition.interimResults = true;
       this.recognition.lang = language || "en-US";
 
@@ -59,11 +63,11 @@ class VoiceAssistantEngine {
         let finalTranscript = "";
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const transcript = event.results[i][0].transcript;
+          const trans = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += transcript;
+            finalTranscript += trans;
           } else {
-            interimTranscript += transcript;
+            interimTranscript += trans;
           }
         }
 
@@ -77,8 +81,13 @@ class VoiceAssistantEngine {
       };
 
       this.recognition.onerror = (event) => {
+        if (event.error === "no-speech") {
+          // Ignore no-speech harmless timeout
+          return;
+        }
+
         this.isListening = false;
-        if (onError) onError(event.error);
+        if (onError) onError(event.error || event);
       };
 
       this.recognition.onend = () => {
@@ -89,36 +98,36 @@ class VoiceAssistantEngine {
       this.recognition.start();
       return true;
     } catch (err) {
-      console.error("Error starting speech recognition:", err);
+      console.warn("Error starting speech recognition:", err);
       if (onError) onError(err);
       return false;
     }
   }
 
   stopListening() {
+    this.manualStop = true;
     if (this.recognition) {
       try {
         this.recognition.stop();
-      } catch {
-        // ignore
-      }
+      } catch {}
       this.isListening = false;
     }
   }
 
-  // 3. Text-to-Speech (TTS) Synthesis
+  // 3. Text-to-Speech (TTS) Synthesis using Web Speech API
   speak(text, { voiceURI, pitch = 1.0, rate = 1.0, language = "en-US", onStart, onEnd } = {}) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
     this.stopSpeaking();
 
-    // Clean markdown symbols for natural speech
+    // Clean markdown symbols & emojis for natural voice synthesis
     const cleanText = text
       .replace(/###\s+/g, "")
       .replace(/\*\*(.*?)\*\*/g, "$1")
       .replace(/\*(.*?)\*/g, "$1")
       .replace(/`{1,3}[\s\S]*?`{1,3}/g, "") // remove code blocks
       .replace(/\[(.*?)\]\(.*?\)/g, "$1") // markdown links
+      .replace(/[📞📹💬✉️🚀✨🔐⚡🔴🧠🔊❌🤔]/g, "") // remove common icons
       .replace(/^[>\s#\-_*]+/gm, "")
       .trim();
 
@@ -126,7 +135,7 @@ class VoiceAssistantEngine {
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.pitch = Math.max(0.5, Math.min(1.5, pitch));
-    utterance.rate = Math.max(0.7, Math.min(1.4, rate));
+    utterance.rate = Math.max(0.7, Math.min(1.3, rate));
 
     const voices = this.getVoices();
     if (voiceURI && voiceURI !== "default") {
@@ -135,7 +144,9 @@ class VoiceAssistantEngine {
         utterance.voice = selected;
       }
     } else if (language) {
-      const langVoice = voices.find((v) => v.lang.startsWith(language.split("-")[0]));
+      // Pick voice matching language code (e.g. hi-IN or en-IN / en-US)
+      const langPrefix = language.split("-")[0].toLowerCase();
+      const langVoice = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith(langPrefix));
       if (langVoice) {
         utterance.voice = langVoice;
       }

@@ -1,4 +1,6 @@
-// Advanced Multilingual AI Voice Assistant Engine with Autonomous Action Parser & Personalities
+import { matchContact } from "../../utils/fuzzyMatcher.js";
+import User from "../../Models/userModels.js";
+import Conversation from "../../Models/conversationModels.js";
 
 // 1. Live Knowledge Fetcher
 async function fetchOnlineKnowledge(query) {
@@ -49,116 +51,285 @@ function trySolveMath(prompt) {
     return null;
 }
 
-// 3. Autonomous Voice Command & App Action Parser
-function parseAutonomousAction(prompt) {
-    const lower = prompt.toLowerCase().trim();
+// 3. Comprehensive Multilingual Intent & Entity Parser (English + Hindi / Hinglish)
+export function parseVoiceIntent(rawPrompt) {
+    const prompt = (rawPrompt || "").trim();
+    const lower = prompt.toLowerCase();
 
-    // 1. SEND MESSAGE: "send message to [name] saying [message]" / "[name] ko message bhejo [message]"
-    const sendMatch = lower.match(/(?:send\s+message\s+to|send\s+a\s+message\s+to|tell|message)\s+([a-zA-Z0-9_\s]+?)\s+(?:saying|that|:)\s+(.+)/i) ||
-                      lower.match(/([a-zA-Z0-9_\s]+?)\s+ko\s+message\s+bhejo\s+(.+)/i);
-    if (sendMatch) {
-        const targetName = sendMatch[1].trim();
-        const msgText = sendMatch[2].trim();
+    // ================= A. VIDEO CALL INTENT =================
+    // English: "video call [name]", "start video call with [name]", "make a video call to [name]"
+    // Hindi: "[name] ko video call karo", "[name] se video call karo", "[name] ke sath video call lagao"
+    const videoCallEn = lower.match(/(?:start\s+video\s+call\s+with|make\s+a\s+video\s+call\s+to|video\s+call)\s+([a-zA-Z0-9_\s]+)$/i);
+    const videoCallHi = lower.match(/([a-zA-Z0-9_\s]+?)\s+(?:ko|se|ke\s+sath)\s+video\s+call\s+(?:karo|lagao|start\s+karo)/i);
+
+    if (videoCallEn || videoCallHi) {
+        const contactName = (videoCallEn ? videoCallEn[1] : videoCallHi[1]).trim();
         return {
-            type: "SEND_MESSAGE",
-            targetName,
-            text: msgText,
-            feedback: `Sending message to **${targetName}**: "${msgText}" ✉️`
+            intent: "VIDEO_CALL",
+            contactName,
+            isHindi: !!videoCallHi
         };
     }
 
-    // 2. OPEN CHAT: "open chat with [name]" / "open [name] chat" / "chat with [name]" / "[name] ki chat kholo"
-    const openMatch = lower.match(/(?:open\s+chat\s+with|open\s+chat\s+for|open|chat\s+with)\s+([a-zA-Z0-9_\s]+?)(?:\s+chat|\s+conversation)?$/i) ||
-                      lower.match(/([a-zA-Z0-9_\s]+?)\s+ki\s+chat\s+kholo/i);
-    if (openMatch && !lower.includes("settings") && !lower.includes("privacy") && !lower.includes("meetings")) {
-        const targetName = openMatch[1].trim();
+    // ================= B. VOICE CALL INTENT =================
+    // English: "call [name]", "voice call [name]", "make a call to [name]", "dial [name]", "phone [name]"
+    // Hindi: "[name] ko call karo", "[name] ko phone lagao", "[name] se call par baat karao", "[name] ko call lagao"
+    const voiceCallEn = lower.match(/(?:voice\s+call|make\s+a\s+call\s+to|start\s+a\s+call\s+with|dial|call)\s+([a-zA-Z0-9_\s]+)$/i);
+    const voiceCallHi = lower.match(/([a-zA-Z0-9_\s]+?)\s+(?:ko|se)\s+(?:call|phone)\s+(?:karo|lagao|par\s+baat\s+karao)/i);
+
+    if (voiceCallEn || voiceCallHi) {
+        const contactName = (voiceCallEn ? voiceCallEn[1] : voiceCallHi[1]).trim();
+        // Disregard if it's "call log" or general queries
+        if (!["log", "logs", "history"].includes(contactName)) {
+            return {
+                intent: "VOICE_CALL",
+                contactName,
+                isHindi: !!voiceCallHi
+            };
+        }
+    }
+
+    // ================= C. SEND MESSAGE INTENT =================
+    // English: "send a message to [name] saying [message]", "send message to [name] that [message]",
+    //          "message [name] that [message]", "tell [name] [message]", "text [name] [message]"
+    // Hindi: "[name] ko bolo [message]", "[name] ko message bhejo [message]",
+    //        "[name] ko text karo [message]", "[name] ko keh do [message]"
+    const sendMsgEn = lower.match(/(?:send\s+a\s+message\s+to|send\s+message\s+to|message|tell|text)\s+([a-zA-Z0-9_\s]+?)\s+(?:saying|that|:)\s+(.+)/i) ||
+                      lower.match(/(?:send\s+a\s+message\s+to|send\s+message\s+to|message|text)\s+([a-zA-Z0-9_\s]+?)\s+([a-zA-Z0-9\s.,!?]+)$/i);
+
+    const sendMsgHi = lower.match(/([a-zA-Z0-9_\s]+?)\s+ko\s+(?:message\s+bhejo|message\s+karo|bolo|keh\s+do|likho|text\s+karo)\s+(.+)/i) ||
+                      lower.match(/([a-zA-Z0-9_\s]+?)\s+ko\s+(.+)\s+bhejo/i);
+
+    if (sendMsgEn || sendMsgHi) {
+        const match = sendMsgEn || sendMsgHi;
+        const contactName = match[1].trim();
+        const messageText = match[2].trim();
         return {
-            type: "OPEN_CHAT",
-            targetName,
-            feedback: `Opening conversation with **${targetName}** 💬`
+            intent: "SEND_MESSAGE",
+            contactName,
+            messageText,
+            isHindi: !!sendMsgHi
         };
     }
 
-    // 3. CLOSE CHAT: "close chat" / "close current chat" / "exit chat" / "chat band karo"
+    // ================= D. OPEN CHAT INTENT =================
+    // English: "open chat with [name]", "show me my chat with [name]", "chat with [name]", "open [name]"
+    // Hindi: "[name] ka chat kholo", "[name] ki chat kholo", "[name] se chat karo", "[name] ka inbox kholo"
+    const openChatEn = lower.match(/(?:open\s+chat\s+with|show\s+me\s+my\s+chat\s+with|open\s+chat\s+for|chat\s+with|talk\s+to)\s+([a-zA-Z0-9_\s]+?)(?:\s+chat)?$/i) ||
+                       lower.match(/^open\s+([a-zA-Z0-9_\s]+?)(?:\s+chat)?$/i);
+
+    const openChatHi = lower.match(/([a-zA-Z0-9_\s]+?)\s+(?:ka|ki|ke)\s+(?:chat|inbox)\s+kholo/i) ||
+                       lower.match(/([a-zA-Z0-9_\s]+?)\s+se\s+(?:chat|baat)\s+karo/i) ||
+                       lower.match(/([a-zA-Z0-9_\s]+?)\s+ko\s+open\s+karo/i);
+
+    if (openChatEn || openChatHi) {
+        const contactName = (openChatEn ? openChatEn[1] : openChatHi[1]).trim();
+        const forbidden = ["settings", "setting", "privacy", "meetings", "calls", "stories", "channels"];
+        if (!forbidden.includes(contactName)) {
+            return {
+                intent: "OPEN_CHAT",
+                contactName,
+                isHindi: !!openChatHi
+            };
+        }
+    }
+
+    // ================= E. CLOSE CHAT INTENT =================
     if (/^(close\s+chat|close\s+conversation|exit\s+chat|go\s+back|chat\s+band\s+karo)/i.test(lower)) {
-        return {
-            type: "CLOSE_CHAT",
-            feedback: `Closing current conversation and returning to home screen ↩️`
-        };
+        return { intent: "CLOSE_CHAT" };
     }
 
-    // 4. DELETE / CLEAR CHAT: "delete chat with [name]" / "clear chat with [name]"
-    const deleteMatch = lower.match(/(?:delete|clear)\s+chat\s+with\s+([a-zA-Z0-9_\s]+)/i);
-    if (deleteMatch) {
-        const targetName = deleteMatch[1].trim();
-        return {
-            type: "DELETE_CHAT",
-            targetName,
-            feedback: `Ready to delete chat with **${targetName}**. Please confirm action 🗑️`
-        };
-    }
-
-    // 5. SEARCH: "search for [term]" / "find [term]" / "dhoondo [term]"
-    const searchMatch = lower.match(/(?:search\s+for|search|find|dhoondo)\s+(.+)/i);
-    if (searchMatch && !lower.startsWith("search settings")) {
-        const query = searchMatch[1].trim();
-        return {
-            type: "SEARCH",
-            query,
-            feedback: `Searching conversations for "**${query}**" 🔍`
-        };
-    }
-
-    // 6. NAVIGATION: "open settings", "go to privacy", "open meetings", "show calls", "open stories", "open linked devices"
-    if (lower.includes("settings") || lower.includes("setting")) {
-        return { type: "NAVIGATE", targetView: "settings", feedback: `Opening App Settings ⚙️` };
+    // ================= F. NAVIGATION INTENTS =================
+    if (lower.includes("setting")) {
+        return { intent: "NAVIGATE", targetView: "settings" };
     }
     if (lower.includes("privacy") || lower.includes("security")) {
-        return { type: "NAVIGATE", targetView: "privacy", feedback: `Opening Security & Privacy settings 🔒` };
+        return { intent: "NAVIGATE", targetView: "privacy" };
     }
-    if (lower.includes("meeting") || lower.includes("video conference")) {
-        return { type: "NAVIGATE", targetView: "meetings", feedback: `Opening Meetings & Video Room 📅` };
+    if (lower.includes("meeting") || lower.includes("video room")) {
+        return { intent: "NAVIGATE", targetView: "meetings" };
     }
-    if (lower.includes("call") || lower.includes("phone calls")) {
-        return { type: "NAVIGATE", targetView: "calls", feedback: `Opening Calls Log 📞` };
+    if (lower.includes("call log") || lower.includes("calls") || lower.includes("call history")) {
+        return { intent: "NAVIGATE", targetView: "calls" };
     }
-    if (lower.includes("story") || lower.includes("stories") || lower.includes("status")) {
-        return { type: "NAVIGATE", targetView: "stories", feedback: `Opening Stories & Status Updates ⭕` };
+    if (lower.includes("story") || lower.includes("status")) {
+        return { intent: "NAVIGATE", targetView: "stories" };
     }
-    if (lower.includes("linked device") || lower.includes("link device")) {
-        return { type: "NAVIGATE", targetView: "linked_devices", feedback: `Opening Linked Devices Manager 💻` };
-    }
-    if (lower.includes("channel") || lower.includes("channels")) {
-        return { type: "NAVIGATE", targetView: "channels", feedback: `Opening Channels Directory 📢` };
+    if (lower.includes("linked device") || lower.includes("linked devices")) {
+        return { intent: "NAVIGATE", targetView: "linked_devices" };
     }
 
-    // 7. LOCK APP: "lock app" / "lock the application" / "app lock karo"
+    // ================= G. LOCK APP INTENT =================
     if (/^(lock\s+app|lock\s+application|secure\s+app|app\s+lock\s+karo)/i.test(lower)) {
-        return {
-            type: "LOCK_APP",
-            feedback: `Locking Aryavarta App now 🔐`
-        };
+        return { intent: "LOCK_APP" };
     }
 
     return null;
 }
 
-// 4. Multilingual Personality Generator
-function applyPersonalityFormatting(reply, personality = "arya", userName = "friend") {
-    switch (personality.toLowerCase()) {
-        case "chanakya":
-            return `📜 **Chanakya Speaks:**\n\n> *"Knowledge and decisive action are the greatest weapons of the noble."*\n\n${reply}\n\n*Execute with strategy and wisdom, ${userName}.* 🏛️`;
-        case "saraswati":
-            return `🪕 **Saraswati's Insight:**\n\n> *विद्या ददाति विनयं — Knowledge bestows true humility and illumination.*\n\n${reply}\n\n*May clarity and wisdom guide your endeavors, ${userName}.* ✨`;
-        case "techpro":
-            return `⚡ **TechPro Response:**\n\n${reply.replace(/Namaste.*?\n\n/i, "")}\n\n*Status: Success | Latency: 4ms*`;
-        case "arya":
-        default:
-            return reply;
-    }
-}
+// 4. Dedicated Voice Command Handler Endpoint (POST /api/ai/voice-command)
+export const handleVoiceCommand = async (req, res) => {
+    try {
+        const { text, language = "en-US", contacts: clientContacts } = req.body;
+        const user = req.user;
 
-// 5. Main AI Assistant Controller
+        if (!text || text.trim() === "") {
+            return res.status(400).json({
+                success: false,
+                message: "Voice transcript text is required"
+            });
+        }
+
+        const prompt = text.trim();
+        const parsed = parseVoiceIntent(prompt);
+
+        // If no structured command parsed, fall back to conversational AI
+        if (!parsed) {
+            return handleAIChat(req, res);
+        }
+
+        const { intent, contactName, messageText, targetView, isHindi } = parsed;
+
+        // If command does not require contact (e.g. NAVIGATE, LOCK_APP, CLOSE_CHAT)
+        if (intent === "NAVIGATE" || intent === "LOCK_APP" || intent === "CLOSE_CHAT") {
+            let feedback = "";
+            let speechReply = "";
+
+            if (intent === "NAVIGATE") {
+                feedback = `Navigating to **${targetView}** 🚀`;
+                speechReply = isHindi ? `${targetView} खोल रहा हूँ` : `Opening ${targetView}`;
+            } else if (intent === "LOCK_APP") {
+                feedback = `Locking Aryavarta App now 🔐`;
+                speechReply = isHindi ? `ऐप लॉक कर रहा हूँ` : `Locking the app now`;
+            } else {
+                feedback = `Closing current conversation ↩️`;
+                speechReply = isHindi ? `चैट बंद कर दी` : `Chat closed`;
+            }
+
+            return res.status(200).json({
+                success: true,
+                intent,
+                action: { type: intent, targetView },
+                actionReady: true,
+                speechReply,
+                textReply: feedback
+            });
+        }
+
+        // Fetch contacts for matching if not passed from client
+        let availableContacts = clientContacts;
+        if (!Array.isArray(availableContacts) || availableContacts.length === 0) {
+            if (user && user._id) {
+                const conversations = await Conversation.find({ participants: user._id })
+                    .populate("participants", "fullname username profilepic gender");
+                
+                const set = new Map();
+                conversations.forEach((conv) => {
+                    conv.participants.forEach((p) => {
+                        if (p._id.toString() !== user._id.toString()) {
+                            set.set(p._id.toString(), p);
+                        }
+                    });
+                });
+                availableContacts = Array.from(set.values());
+            }
+
+            if (!availableContacts || availableContacts.length === 0) {
+                availableContacts = await User.find({ _id: { $ne: user?._id } })
+                    .select("fullname username profilepic gender")
+                    .limit(50);
+            }
+        }
+
+        // Fuzzy match contact name
+        const matchResult = matchContact(contactName, availableContacts);
+
+        // Case 1: Contact not found
+        if (!matchResult.found) {
+            const speechReply = isHindi
+                ? `मुझे आपकी संपर्क सूची में ${contactName} नाम का कोई संपर्क नहीं मिला।`
+                : `I couldn't find anyone named ${contactName} in your contacts.`;
+
+            return res.status(200).json({
+                success: true,
+                intent,
+                actionReady: false,
+                notFound: true,
+                searchedName: contactName,
+                speechReply,
+                textReply: `❌ Could not find contact matching "**${contactName}**".`
+            });
+        }
+
+        // Case 2: Ambiguous match (multiple contacts like Rahul Sharma & Rahul Verma)
+        if (matchResult.isAmbiguous && matchResult.candidates.length > 1) {
+            const namesList = matchResult.candidates.map((c) => c.fullname);
+            const speechReply = isHindi
+                ? `मुझे ${contactName} नाम के ${matchResult.candidates.length} संपर्क मिले: ${namesList.join(" या ")}। आप किसे चुनना चाहते हैं?`
+                : `I found ${matchResult.candidates.length} contacts named ${contactName}: ${namesList.join(" or ")}. Which one did you mean?`;
+
+            return res.status(200).json({
+                success: true,
+                intent,
+                actionReady: false,
+                clarificationNeeded: true,
+                candidates: matchResult.candidates,
+                searchedName: contactName,
+                messageText,
+                speechReply,
+                textReply: `🤔 Found multiple contacts for "**${contactName}**". Please select one:`
+            });
+        }
+
+        // Case 3: High confidence single match -> Action is ready to execute!
+        const matchedContact = matchResult.bestMatch;
+        let speechReply = "";
+        let textReply = "";
+
+        if (intent === "OPEN_CHAT") {
+            speechReply = isHindi
+                ? `${matchedContact.fullname} के साथ चैट खोल रहा हूँ`
+                : `Opening chat with ${matchedContact.fullname}`;
+            textReply = `Opening conversation with **${matchedContact.fullname}** 💬`;
+        } else if (intent === "SEND_MESSAGE") {
+            speechReply = isHindi
+                ? `${matchedContact.fullname} को संदेश भेज दिया`
+                : `Sending message to ${matchedContact.fullname}`;
+            textReply = `Sending message to **${matchedContact.fullname}**: "${messageText}" ✉️`;
+        } else if (intent === "VOICE_CALL") {
+            speechReply = isHindi
+                ? `${matchedContact.fullname} को कॉल मिला रहा हूँ`
+                : `Calling ${matchedContact.fullname} now`;
+            textReply = `Calling **${matchedContact.fullname}** 📞`;
+        } else if (intent === "VIDEO_CALL") {
+            speechReply = isHindi
+                ? `${matchedContact.fullname} को वीडियो कॉल मिला रहा हूँ`
+                : `Starting video call with ${matchedContact.fullname}`;
+            textReply = `Starting video call with **${matchedContact.fullname}** 📹`;
+        }
+
+        return res.status(200).json({
+            success: true,
+            intent,
+            actionReady: true,
+            action: {
+                type: intent,
+                contact: matchedContact,
+                text: messageText
+            },
+            speechReply,
+            textReply
+        });
+    } catch (error) {
+        console.error("Error in Voice Command handler:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to process voice command"
+        });
+    }
+};
+
+// 5. General AI Chat Controller
 export const handleAIChat = async (req, res) => {
     try {
         const { message, personality: reqPersonality, language: reqLang } = req.body;
@@ -177,55 +348,30 @@ export const handleAIChat = async (req, res) => {
         const userName = user?.fullname || "friend";
 
         let aiReply = "";
-        let recognizedAction = parseAutonomousAction(prompt);
+        let recognizedAction = parseVoiceIntent(prompt);
 
-        // 1. If an autonomous app command was parsed
         if (recognizedAction) {
-            aiReply = recognizedAction.feedback;
-        }
-        // 2. Math solving
-        else if (trySolveMath(prompt)) {
+            aiReply = `Action recognized: ${recognizedAction.intent}`;
+        } else if (trySolveMath(prompt)) {
             aiReply = trySolveMath(prompt);
-        }
-        // 3. Greetings (Multilingual)
-        else if (/^(hi|hello|hey|namaste|namaskar|hola|bonjour|guten tag|kaise ho|kya haal hai|kem cho)\b/i.test(lowerPrompt)) {
+        } else if (/^(hi|hello|hey|namaste|namaskar|hola|bonjour|guten tag|kaise ho|kya haal hai|kem cho)\b/i.test(lowerPrompt)) {
             if (/^(namaste|namaskar|kaise ho|kya haal hai)/i.test(lowerPrompt)) {
-                aiReply = `नमस्ते ${userName}! 🙏 मैं **आर्यावर्त AI वॉइस असिस्टेंट** हूँ।\n\nआप मुझसे बोलकर कोई भी चैट खोल सकते हैं, मैसेज भेज सकते हैं, सेटिंग्स में जा सकते हैं या कोई भी सवाल पूछ सकते हैं! ⚡`;
-            } else if (/^(hola)/i.test(lowerPrompt)) {
-                aiReply = `¡Hola ${userName}! 🌟 Soy **Aryavarta AI**, tu asistente de voz personal. ¿En qué te puedo ayudar hoy?`;
-            } else if (/^(bonjour)/i.test(lowerPrompt)) {
-                aiReply = `Bonjour ${userName}! 🌸 Je suis **Aryavarta AI**, votre assistant vocal intelligent. Comment puis-je vous aider aujourd'hui?`;
+                aiReply = `नमस्ते ${userName}! 🙏 मैं **आर्यावर्त AI वॉइस असिस्टेंट** हूँ।\n\nआप मुझसे बोलकर किसी को भी कॉल कर सकते हैं, चैट खोल सकते हैं, मैसेज भेज सकते हैं या सेटिंग्स खोल सकते हैं! ⚡`;
             } else {
-                aiReply = `Namaste ${userName}! 🙏 I am **Aryavarta AI Voice Assistant**, your intelligent companion.
-                
-You can chat with me naturally in multiple languages or command me to:
-- 💬 **Open or close chats**: *"Open chat with Rahul"*
-- ✉️ **Send messages**: *"Send message to Priya saying I am on my way"*
-- ⚙️ **Navigate**: *"Open privacy settings"*, *"Go to meetings"*
-- 🔍 **Search & Lock**: *"Search for project notes"*, *"Lock the app"*
-- 💡 **Ask anything**: Coding, math, science, history & drafts!`;
+                aiReply = `Namaste ${userName}! 🙏 I am **Aryavarta AI Voice Assistant**.\n\nYou can command me with your voice:\n- 📞 *"Call Rahul"* or *"Video call Priya"*\n- ✉️ *"Send message to Rahul saying I am on my way"*\n- 💬 *"Open chat with Priya"*\n- ⚙️ *"Open settings"* or *"Lock app"*`;
             }
-        }
-        // 4. Identity
-        else if (lowerPrompt.includes("who are you") || lowerPrompt.includes("tum kaun ho") || lowerPrompt.includes("your name")) {
-            aiReply = `I am **Aryavarta AI Voice Assistant** ⚡ — an intelligent multilingual assistant capable of natural conversations and autonomous app actions across Aryavarta!`;
-        }
-        // 5. General Knowledge Search & Synthesis
-        else {
+        } else {
             const liveResult = await fetchOnlineKnowledge(prompt);
             if (liveResult) {
-                aiReply = `### 📚 ${liveResult.title}\n${liveResult.description ? `*${liveResult.description}*\n\n` : ""}${liveResult.extract}\n\n---\n*Need more depth or code examples on this topic? Just ask!* 🚀`;
+                aiReply = `### 📚 ${liveResult.title}\n${liveResult.description ? `*${liveResult.description}*\n\n` : ""}${liveResult.extract}\n\n---\n*Need more depth on this topic? Just ask!* 🚀`;
             } else {
-                aiReply = `### 💡 Aryavarta AI: "${prompt}"\n\n**${prompt}** is an essential topic. Here is a clear overview:\n\n1. **Core Concept**: It provides structured frameworks and scalable patterns for solving real-world challenges.\n2. **Key Advantages**: High reliability, widespread adoption, and seamless integration with modern tooling.\n3. **Practical Application**: You can utilize this for rapid engineering and enhanced decision making.\n\n*Feel free to ask for deeper technical breakdowns, ${userName}!* ✨`;
+                aiReply = `### 💡 Aryavarta AI: "${prompt}"\n\n**${prompt}** is an essential topic. You can ask me to perform voice actions across Aryavarta or explore questions in coding, science, and history! ✨`;
             }
         }
-
-        // Apply selected personality formatting
-        const finalReply = applyPersonalityFormatting(aiReply, personality, userName);
 
         return res.status(200).json({
             success: true,
-            reply: finalReply,
+            reply: aiReply,
             action: recognizedAction,
             personality,
             timestamp: new Date().toISOString()
