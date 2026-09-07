@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 import {
   ArrowLeft,
@@ -6,26 +6,41 @@ import {
   QrCode,
   Pencil,
   PlusCircle,
+  IndianRupee,
+  Diamond,
+  Laptop,
   KeyRound,
   Lock,
+  Users,
   MessageSquare,
-  PhoneCall,
+  Palette,
+  Radio,
   Bell,
-  Laptop,
-  Sparkles,
-  Volume2,
-  Keyboard,
+  HardDrive,
+  Shield,
+  PersonStanding,
+  Globe,
   HelpCircle,
+  UserPlus,
+  PhoneCall,
   ChevronRight,
   X
 } from "lucide-react";
 import UserQRCodeModal from "../Modals/UserQRCodeModal";
 import StatusMoodModal from "../Modals/StatusMoodModal";
 import LinkedDevicesModal from "../Modals/LinkedDevicesModal";
-import toast from "react-hot-toast";
+import PaymentsModal from "../Modals/PaymentsModal";
+import SubscriptionsModal from "../Modals/SubscriptionsModal";
+import ListsModal from "../Modals/ListsModal";
+import BroadcastModal from "../Modals/BroadcastModal";
+import ShareAppModal from "../Modals/ShareAppModal";
 
 const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
   const { authUser, setAuthUser } = useAuthContext();
+
+  // Scroll detection for dynamic title in top bar
+  const scrollRef = useRef(null);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -35,10 +50,15 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
   const [showQRModal, setShowQRModal] = useState(false);
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [showLinkedDevicesModal, setShowLinkedDevicesModal] = useState(false);
+  const [showPaymentsModal, setShowPaymentsModal] = useState(false);
+  const [showSubscriptionsModal, setShowSubscriptionsModal] = useState(false);
+  const [showListsModal, setShowListsModal] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
-  // Status text from user or default
+  // Status text matching screenshot ("I'm feeling...")
   const [userStatus, setUserStatus] = useState(() => {
-    return authUser?.status || localStorage.getItem("aryavarta_user_status") || "Right now I'm...";
+    return authUser?.status || localStorage.getItem("aryavarta_user_status") || "I'm feeling...";
   });
 
   const handleSaveStatus = (newStatus) => {
@@ -51,12 +71,38 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
     }
   };
 
-  const handleAddStory = () => {
-    setShowMoodModal(true);
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      setIsScrolled(scrollRef.current.scrollTop > 90);
+    }
   };
 
-  // Real, fully functional settings categories
+  // Full menu list matching screenshots exactly
   const MENU_ITEMS = [
+    {
+      id: "payments",
+      title: "Payments",
+      subtitle: "",
+      icon: IndianRupee,
+      iconBg: "bg-slate-700 text-slate-200",
+      action: () => setShowPaymentsModal(true)
+    },
+    {
+      id: "subscriptions",
+      title: "Subscriptions",
+      subtitle: "Explore premium benefits",
+      icon: Diamond,
+      iconBg: "bg-indigo-500/20 text-indigo-400",
+      action: () => setShowSubscriptionsModal(true)
+    },
+    {
+      id: "linked_devices",
+      title: "Linked devices",
+      subtitle: "Use Aryavarta on other devices",
+      icon: Laptop,
+      iconBg: "bg-slate-800 text-slate-300",
+      action: () => setShowLinkedDevicesModal(true)
+    },
     {
       id: "account",
       title: "Account",
@@ -74,12 +120,36 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
       action: () => setActiveCategory("privacy")
     },
     {
+      id: "lists",
+      title: "Lists",
+      subtitle: "Manage people and groups",
+      icon: Users,
+      iconBg: "bg-slate-800 text-slate-300",
+      action: () => setShowListsModal(true)
+    },
+    {
       id: "chats",
       title: "Chats",
-      subtitle: "Theme, wallpaper, chat history",
+      subtitle: "Chat history, backup",
       icon: MessageSquare,
       iconBg: "bg-slate-800 text-slate-300",
       action: () => setActiveCategory("chats")
+    },
+    {
+      id: "appearance",
+      title: "Appearance",
+      subtitle: "Chat theme, app icon, app theme",
+      icon: Palette,
+      iconBg: "bg-purple-500/20 text-purple-400",
+      action: () => setActiveCategory("appearance")
+    },
+    {
+      id: "broadcasts",
+      title: "Broadcasts",
+      subtitle: "Manage lists and send broadcasts",
+      icon: Radio,
+      iconBg: "bg-cyan-500/20 text-cyan-400",
+      action: () => setShowBroadcastModal(true)
     },
     {
       id: "calls_meetings",
@@ -92,74 +162,93 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
     {
       id: "notifications",
       title: "Notifications",
-      subtitle: "Messages, groups, tones & alerts",
+      subtitle: "Message, group & call tones",
       icon: Bell,
       iconBg: "bg-slate-800 text-slate-300",
       action: () => setActiveCategory("notifications")
     },
     {
-      id: "linked_devices",
-      title: "Linked devices",
-      subtitle: "Use Aryavarta on other devices",
-      icon: Laptop,
+      id: "storage",
+      title: "Storage and data",
+      subtitle: "Network usage, auto-download",
+      icon: HardDrive,
       iconBg: "bg-slate-800 text-slate-300",
-      action: () => setShowLinkedDevicesModal(true)
+      action: () => setActiveCategory("storage")
     },
     {
-      id: "ai_voice",
-      title: "AI Voice & Personality",
-      subtitle: "Arya, Chanakya, speech & models",
-      icon: Sparkles,
-      iconBg: "bg-indigo-500/20 text-indigo-400",
-      action: () => setActiveCategory("ai_voice")
+      id: "parental",
+      title: "Parental controls",
+      subtitle: "Settings for your family",
+      icon: Shield,
+      iconBg: "bg-slate-800 text-slate-300",
+      action: () => setActiveCategory("parental")
     },
     {
-      id: "voice",
-      title: "Audio & Video Devices",
-      subtitle: "Test microphone & speakers",
-      icon: Volume2,
+      id: "accessibility",
+      title: "Accessibility",
+      subtitle: "Increase contrast, animation",
+      icon: PersonStanding,
       iconBg: "bg-slate-800 text-slate-300",
-      action: () => setActiveCategory("voice")
+      action: () => setActiveCategory("accessibility")
     },
     {
-      id: "shortcuts",
-      title: "Keyboard shortcuts",
-      subtitle: "Quick navigation hotkeys",
-      icon: Keyboard,
+      id: "language",
+      title: "App language",
+      subtitle: "English (device's language)",
+      icon: Globe,
       iconBg: "bg-slate-800 text-slate-300",
-      action: () => setActiveCategory("shortcuts")
+      action: () => setActiveCategory("language")
     },
     {
       id: "help",
-      title: "Help & About",
-      subtitle: "Help center, licenses, privacy policy",
+      title: "Help and feedback",
+      subtitle: "Help center, contact us, privacy policy",
       icon: HelpCircle,
       iconBg: "bg-slate-800 text-slate-300",
       action: () => setActiveCategory("help")
+    },
+    {
+      id: "invite",
+      title: "Invite a friend",
+      subtitle: "",
+      icon: UserPlus,
+      iconBg: "bg-pink-500/20 text-pink-400",
+      action: () => setShowShareModal(true)
     }
   ];
 
-  const filteredItems = MENU_ITEMS.filter((item) =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredItems = MENU_ITEMS.filter(
+    (item) =>
+      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <aside className="w-full md:w-80 lg:w-[350px] flex flex-col h-full min-h-0 bg-[#0c1317] border-r border-slate-800/80 z-10 box-border select-none">
-      {/* 1. Upper Top Bar */}
+      {/* 1. Upper Top Bar (Matching Screenshot 1 & 2) */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/50 bg-[#111b21] flex-shrink-0">
-        {/* Left: Back button */}
-        <button
-          onClick={onBack}
-          className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
-          title="Back to chats"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+        {/* Left: Back button + Dynamic title on scroll */}
+        <div className="flex items-center gap-3 min-w-0 pr-2">
+          <button
+            onClick={onBack}
+            className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer flex-shrink-0"
+            title="Back to chats"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+
+          {/* Name appears on scroll like in Screenshot 1 */}
+          <h2
+            className={`text-base font-bold text-white tracking-tight truncate transition-opacity duration-200 ${
+              isScrolled ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+          >
+            {authUser?.fullname || "Dheeraj Singh"}
+          </h2>
+        </div>
 
         {/* Right Action Icons: Search, QR Code, Edit Pencil */}
-        <div className="flex items-center gap-2">
-          {/* Search Icon */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <button
             onClick={() => setSearchOpen((prev) => !prev)}
             className={`p-2 rounded-full transition-colors cursor-pointer ${
@@ -172,7 +261,6 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
             <Search className="w-5 h-5" />
           </button>
 
-          {/* QR Code Icon */}
           <button
             onClick={() => setShowQRModal(true)}
             className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
@@ -181,7 +269,6 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
             <QrCode className="w-5 h-5" />
           </button>
 
-          {/* Edit Pencil Icon */}
           <button
             onClick={() => setActiveCategory("profile")}
             className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
@@ -216,7 +303,11 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
       )}
 
       {/* 2. Scrollable Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800"
+      >
         {/* Profile & Status Header with Doodle Pattern */}
         <div className="relative pt-6 pb-6 px-4 flex flex-col items-center bg-gradient-to-b from-[#18232c] via-[#10171d] to-[#0c1317] border-b border-slate-800/60 overflow-hidden">
           {/* Subtle chat doodle background overlay */}
@@ -228,16 +319,16 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
             }}
           />
 
-          {/* Thought Bubble ("Right now I'm...") */}
+          {/* Thought Bubble ("I'm feeling...") */}
           <div
             onClick={() => setShowMoodModal(true)}
             className="relative mb-2 cursor-pointer group animate-fadeIn"
-            title="Click to change your thought / status"
+            title="Click to change your feeling / status"
           >
             <div className="bg-white text-slate-900 px-4 py-1.5 rounded-full text-xs font-semibold shadow-md flex items-center gap-1.5 hover:bg-slate-100 transition-all transform group-hover:scale-105 border border-slate-200/50">
               <span className="truncate max-w-[200px]">{userStatus}</span>
             </div>
-            {/* Thought bubble pointer tail pointing down to avatar */}
+            {/* Pointer tail */}
             <div className="w-2.5 h-2.5 bg-white rounded-full mx-auto -mt-0.5 shadow-sm" />
             <div className="w-1.5 h-1.5 bg-white rounded-full mx-auto mt-0.5 shadow-sm" />
           </div>
@@ -265,19 +356,19 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
           {/* User Name with Green Circled Plus Icon */}
           <div className="flex items-center justify-center gap-2">
             <h2 className="text-lg md:text-xl font-bold text-white tracking-tight text-center">
-              {authUser?.fullname || "User"}
+              {authUser?.fullname || "Dheeraj Singh"}
             </h2>
             <button
-              onClick={handleAddStory}
+              onClick={() => setShowMoodModal(true)}
               className="text-[#00a884] hover:text-emerald-400 transition-colors p-0.5 cursor-pointer"
-              title="Set your mood / status"
+              title="Add status / story"
             >
               <PlusCircle className="w-5 h-5 fill-emerald-500/10 stroke-[2.5]" />
             </button>
           </div>
         </div>
 
-        {/* 3. Real Settings Menu List */}
+        {/* 3. Settings Menu List (Matching Screenshots 1 & 2 in exact order) */}
         <div className="py-2">
           {filteredItems.map((item) => {
             const Icon = item.icon;
@@ -316,7 +407,7 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
         </div>
       </div>
 
-      {/* Active Modals */}
+      {/* Modals */}
       {showQRModal && (
         <UserQRCodeModal onClose={() => setShowQRModal(false)} />
       )}
@@ -329,8 +420,28 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
         />
       )}
 
+      {showPaymentsModal && (
+        <PaymentsModal onClose={() => setShowPaymentsModal(false)} />
+      )}
+
+      {showSubscriptionsModal && (
+        <SubscriptionsModal onClose={() => setShowSubscriptionsModal(false)} />
+      )}
+
       {showLinkedDevicesModal && (
         <LinkedDevicesModal onClose={() => setShowLinkedDevicesModal(false)} />
+      )}
+
+      {showListsModal && (
+        <ListsModal onClose={() => setShowListsModal(false)} />
+      )}
+
+      {showBroadcastModal && (
+        <BroadcastModal onClose={() => setShowBroadcastModal(false)} />
+      )}
+
+      {showShareModal && (
+        <ShareAppModal onClose={() => setShowShareModal(false)} />
       )}
     </aside>
   );

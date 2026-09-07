@@ -12,6 +12,11 @@ import AIPersonalitySettings from "../components/Settings/AIPersonalitySettings"
 import VoiceSettings from "../components/Settings/VoiceSettings";
 import NotificationsSettings from "../components/Settings/NotificationsSettings";
 import CallsMeetingsSettings from "../components/Settings/CallsMeetingsSettings";
+import AppearanceSettings from "../components/Settings/AppearanceSettings";
+import StorageDataSettings from "../components/Settings/StorageDataSettings";
+import ParentalControlsSettings from "../components/Settings/ParentalControlsSettings";
+import AccessibilitySettings from "../components/Settings/AccessibilitySettings";
+import LanguageSettings from "../components/Settings/LanguageSettings";
 import KeyboardShortcutsSettings from "../components/Settings/KeyboardShortcutsSettings";
 import HelpSettings from "../components/Settings/HelpSettings";
 import MeetingsView from "../components/Meetings/MeetingsView";
@@ -93,6 +98,16 @@ const Home = () => {
         return <NotificationsSettings onBack={handleBack} />;
       case "calls_meetings":
         return <CallsMeetingsSettings onBack={handleBack} />;
+      case "appearance":
+        return <AppearanceSettings onBack={handleBack} />;
+      case "storage":
+        return <StorageDataSettings onBack={handleBack} />;
+      case "parental":
+        return <ParentalControlsSettings onBack={handleBack} />;
+      case "accessibility":
+        return <AccessibilitySettings onBack={handleBack} />;
+      case "language":
+        return <LanguageSettings onBack={handleBack} />;
       case "shortcuts":
         return <KeyboardShortcutsSettings onBack={handleBack} />;
       case "help":
