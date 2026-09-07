@@ -6,25 +6,21 @@ import {
   QrCode,
   Pencil,
   PlusCircle,
-  IndianRupee,
-  Diamond,
-  Laptop,
   KeyRound,
   Lock,
-  Users,
   MessageSquare,
   PhoneCall,
   Bell,
+  Laptop,
+  Sparkles,
+  Volume2,
+  Keyboard,
   HelpCircle,
   ChevronRight,
-  Sparkles,
   X
 } from "lucide-react";
 import UserQRCodeModal from "../Modals/UserQRCodeModal";
 import StatusMoodModal from "../Modals/StatusMoodModal";
-import SubscriptionsModal from "../Modals/SubscriptionsModal";
-import ManageListsModal from "../Modals/ManageListsModal";
-import ScanAndPayModal from "../Modals/ScanAndPayModal";
 import LinkedDevicesModal from "../Modals/LinkedDevicesModal";
 import toast from "react-hot-toast";
 
@@ -38,9 +34,6 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
   // Modals state
   const [showQRModal, setShowQRModal] = useState(false);
   const [showMoodModal, setShowMoodModal] = useState(false);
-  const [showSubscriptionsModal, setShowSubscriptionsModal] = useState(false);
-  const [showListsModal, setShowListsModal] = useState(false);
-  const [showPaymentsModal, setShowPaymentsModal] = useState(false);
   const [showLinkedDevicesModal, setShowLinkedDevicesModal] = useState(false);
 
   // Status text from user or default
@@ -59,37 +52,11 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
   };
 
   const handleAddStory = () => {
-    toast("Story creator opened! Add your daily updates & photos 📸", {
-      icon: "✨"
-    });
+    setShowMoodModal(true);
   };
 
-  // Menu items list matching Screenshot 1 & 2
+  // Real, fully functional settings categories
   const MENU_ITEMS = [
-    {
-      id: "payments",
-      title: "Payments",
-      subtitle: "",
-      icon: IndianRupee,
-      iconBg: "bg-slate-700 text-slate-200",
-      action: () => setShowPaymentsModal(true)
-    },
-    {
-      id: "subscriptions",
-      title: "Subscriptions",
-      subtitle: "Explore premium benefits",
-      icon: Diamond,
-      iconBg: "bg-indigo-500/20 text-indigo-400",
-      action: () => setShowSubscriptionsModal(true)
-    },
-    {
-      id: "linked_devices",
-      title: "Linked devices",
-      subtitle: "Use Aryavarta on other devices",
-      icon: Laptop,
-      iconBg: "bg-slate-800 text-slate-300",
-      action: () => setShowLinkedDevicesModal(true)
-    },
     {
       id: "account",
       title: "Account",
@@ -107,17 +74,9 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
       action: () => setActiveCategory("privacy")
     },
     {
-      id: "lists",
-      title: "Lists",
-      subtitle: "Manage people and groups",
-      icon: Users,
-      iconBg: "bg-slate-800 text-slate-300",
-      action: () => setShowListsModal(true)
-    },
-    {
       id: "chats",
       title: "Chats",
-      subtitle: "Chat history, backup",
+      subtitle: "Theme, wallpaper, chat history",
       icon: MessageSquare,
       iconBg: "bg-slate-800 text-slate-300",
       action: () => setActiveCategory("chats")
@@ -133,15 +92,47 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
     {
       id: "notifications",
       title: "Notifications",
-      subtitle: "Messages, groups, alert tones",
+      subtitle: "Messages, groups, tones & alerts",
       icon: Bell,
       iconBg: "bg-slate-800 text-slate-300",
       action: () => setActiveCategory("notifications")
     },
     {
+      id: "linked_devices",
+      title: "Linked devices",
+      subtitle: "Use Aryavarta on other devices",
+      icon: Laptop,
+      iconBg: "bg-slate-800 text-slate-300",
+      action: () => setShowLinkedDevicesModal(true)
+    },
+    {
+      id: "ai_voice",
+      title: "AI Voice & Personality",
+      subtitle: "Arya, Chanakya, speech & models",
+      icon: Sparkles,
+      iconBg: "bg-indigo-500/20 text-indigo-400",
+      action: () => setActiveCategory("ai_voice")
+    },
+    {
+      id: "voice",
+      title: "Audio & Video Devices",
+      subtitle: "Test microphone & speakers",
+      icon: Volume2,
+      iconBg: "bg-slate-800 text-slate-300",
+      action: () => setActiveCategory("voice")
+    },
+    {
+      id: "shortcuts",
+      title: "Keyboard shortcuts",
+      subtitle: "Quick navigation hotkeys",
+      icon: Keyboard,
+      iconBg: "bg-slate-800 text-slate-300",
+      action: () => setActiveCategory("shortcuts")
+    },
+    {
       id: "help",
-      title: "Help",
-      subtitle: "Help center, contact us, privacy policy",
+      title: "Help & About",
+      subtitle: "Help center, licenses, privacy policy",
       icon: HelpCircle,
       iconBg: "bg-slate-800 text-slate-300",
       action: () => setActiveCategory("help")
@@ -155,13 +146,13 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
 
   return (
     <aside className="w-full md:w-80 lg:w-[350px] flex flex-col h-full min-h-0 bg-[#0c1317] border-r border-slate-800/80 z-10 box-border select-none">
-      {/* 1. Upper Top Bar (Matching Screenshot 1) */}
+      {/* 1. Upper Top Bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/50 bg-[#111b21] flex-shrink-0">
         {/* Left: Back button */}
         <button
           onClick={onBack}
           className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
-          title="Back"
+          title="Back to chats"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -201,7 +192,7 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
         </div>
       </div>
 
-      {/* Optional Search Bar Input when toggled */}
+      {/* Optional Search Bar Input */}
       {searchOpen && (
         <div className="px-4 py-2 bg-[#111b21] border-b border-slate-800/60 flex items-center gap-2 animate-fadeIn flex-shrink-0">
           <input
@@ -226,7 +217,7 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
 
       {/* 2. Scrollable Body */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
-        {/* Profile & Status Header with Doodle Pattern (Matching Screenshot 1) */}
+        {/* Profile & Status Header with Doodle Pattern */}
         <div className="relative pt-6 pb-6 px-4 flex flex-col items-center bg-gradient-to-b from-[#18232c] via-[#10171d] to-[#0c1317] border-b border-slate-800/60 overflow-hidden">
           {/* Subtle chat doodle background overlay */}
           <div
@@ -241,7 +232,7 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
           <div
             onClick={() => setShowMoodModal(true)}
             className="relative mb-2 cursor-pointer group animate-fadeIn"
-            title="Click to change status"
+            title="Click to change your thought / status"
           >
             <div className="bg-white text-slate-900 px-4 py-1.5 rounded-full text-xs font-semibold shadow-md flex items-center gap-1.5 hover:bg-slate-100 transition-all transform group-hover:scale-105 border border-slate-200/50">
               <span className="truncate max-w-[200px]">{userStatus}</span>
@@ -274,29 +265,32 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
           {/* User Name with Green Circled Plus Icon */}
           <div className="flex items-center justify-center gap-2">
             <h2 className="text-lg md:text-xl font-bold text-white tracking-tight text-center">
-              {authUser?.fullname || "Dheeraj Singh"}
+              {authUser?.fullname || "User"}
             </h2>
             <button
               onClick={handleAddStory}
               className="text-[#00a884] hover:text-emerald-400 transition-colors p-0.5 cursor-pointer"
-              title="Add Story / Status"
+              title="Set your mood / status"
             >
               <PlusCircle className="w-5 h-5 fill-emerald-500/10 stroke-[2.5]" />
             </button>
           </div>
         </div>
 
-        {/* 3. Settings Menu List (Matching Screenshot 1) */}
+        {/* 3. Real Settings Menu List */}
         <div className="py-2">
           {filteredItems.map((item) => {
             const Icon = item.icon;
+            const isSelected = activeCategory === item.id;
             return (
               <div
                 key={item.id}
                 onClick={item.action}
-                className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#16202a] cursor-pointer transition-colors border-b border-slate-800/30 group"
+                className={`flex items-center gap-4 px-5 py-3.5 hover:bg-[#16202a] cursor-pointer transition-colors border-b border-slate-800/30 group ${
+                  isSelected ? "bg-[#16202a]" : ""
+                }`}
               >
-                {/* Icon in clean circle/pill */}
+                {/* Icon in clean circle */}
                 <div
                   className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${item.iconBg}`}
                 >
@@ -333,18 +327,6 @@ const SettingsSidebar = ({ activeCategory, setActiveCategory, onBack }) => {
           onSave={handleSaveStatus}
           onClose={() => setShowMoodModal(false)}
         />
-      )}
-
-      {showSubscriptionsModal && (
-        <SubscriptionsModal onClose={() => setShowSubscriptionsModal(false)} />
-      )}
-
-      {showListsModal && (
-        <ManageListsModal onClose={() => setShowListsModal(false)} />
-      )}
-
-      {showPaymentsModal && (
-        <ScanAndPayModal onClose={() => setShowPaymentsModal(false)} />
       )}
 
       {showLinkedDevicesModal && (
