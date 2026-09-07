@@ -11,6 +11,7 @@ import ChatsSettings from "../components/Settings/ChatsSettings";
 import AIPersonalitySettings from "../components/Settings/AIPersonalitySettings";
 import VoiceSettings from "../components/Settings/VoiceSettings";
 import NotificationsSettings from "../components/Settings/NotificationsSettings";
+import CallsMeetingsSettings from "../components/Settings/CallsMeetingsSettings";
 import KeyboardShortcutsSettings from "../components/Settings/KeyboardShortcutsSettings";
 import HelpSettings from "../components/Settings/HelpSettings";
 import MeetingsView from "../components/Meetings/MeetingsView";
@@ -90,6 +91,8 @@ const Home = () => {
         return <VoiceSettings onBack={handleBack} />;
       case "notifications":
         return <NotificationsSettings onBack={handleBack} />;
+      case "calls_meetings":
+        return <CallsMeetingsSettings onBack={handleBack} />;
       case "shortcuts":
         return <KeyboardShortcutsSettings onBack={handleBack} />;
       case "help":
@@ -99,6 +102,7 @@ const Home = () => {
           <SettingsSidebar
             activeCategory={settingsCategory}
             setActiveCategory={(cat) => setSettingsCategory(cat)}
+            onBack={() => setActiveNav("chats")}
           />
         );
     }

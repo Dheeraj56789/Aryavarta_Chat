@@ -139,6 +139,111 @@ class SoundEffects {
       console.warn("Audio error:", e);
     }
   }
+
+  playCallerTune(tune = "ringing") {
+    try {
+      this.init();
+      if (!this.ctx) return;
+      if (this.ctx.state === "suspended") {
+        this.ctx.resume();
+      }
+
+      const now = this.ctx.currentTime;
+
+      if (tune === "harmony") {
+        // Melodic 3-chord arpeggio
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, now + i * 0.15);
+          gain.gain.setValueAtTime(0.15, now + i * 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.4);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + i * 0.15);
+          osc.stop(now + i * 0.15 + 0.4);
+        });
+        return;
+      }
+
+      if (tune === "flute") {
+        // Peaceful flute sine
+        [440, 493.88, 554.37, 659.25].forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, now + i * 0.2);
+          gain.gain.setValueAtTime(0.12, now + i * 0.2);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.2 + 0.45);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + i * 0.2);
+          osc.stop(now + i * 0.2 + 0.45);
+        });
+        return;
+      }
+
+      if (tune === "guitar") {
+        // Gentle acoustic pluck simulation
+        [329.63, 392.00, 493.88, 587.33].forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(freq, now + i * 0.14);
+          gain.gain.setValueAtTime(0.1, now + i * 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.14 + 0.35);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + i * 0.14);
+          osc.stop(now + i * 0.14 + 0.35);
+        });
+        return;
+      }
+
+      if (tune === "cosmic") {
+        // Cosmic synthwave pulse
+        [261.63, 329.63, 392.00, 523.25].forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "square";
+          osc.frequency.setValueAtTime(freq, now + i * 0.16);
+          gain.gain.setValueAtTime(0.08, now + i * 0.16);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.16 + 0.3);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + i * 0.16);
+          osc.stop(now + i * 0.16 + 0.3);
+        });
+        return;
+      }
+
+      // Default Ringing: Traditional pleasant phone ring cadence (440Hz + 480Hz dual tone)
+      const oscA = this.ctx.createOscillator();
+      const oscB = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      oscA.type = "sine";
+      oscB.type = "sine";
+      oscA.frequency.setValueAtTime(440, now);
+      oscB.frequency.setValueAtTime(480, now);
+
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.setValueAtTime(0.15, now + 0.4);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+      oscA.connect(gain);
+      oscB.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      oscA.start(now);
+      oscB.start(now);
+      oscA.stop(now + 0.5);
+      oscB.stop(now + 0.5);
+    } catch (e) {
+      console.warn("Audio error:", e);
+    }
+  }
 }
 
 export const soundEffects = new SoundEffects();
