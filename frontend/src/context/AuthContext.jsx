@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
+import safeFetch from "../utils/api.js";
 
 const AuthContext = createContext();
 
@@ -92,12 +93,11 @@ export const AuthContextProvider = ({ children }) => {
 
     try {
       console.log("[AuthStartup] Verifying session with backend /api/auth/me...");
-      const res = await fetch("/api/auth/me", {
+      const { res, data } = await safeFetch("/api/auth/me", {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-      const data = await res.json();
 
-      if (res.ok && data.success && data.user) {
+      if (res.ok && data?.success && data?.user) {
         console.log("[AuthStartup] Session verified successfully with backend.");
         const verifiedUser = {
           ...data.user,
@@ -162,15 +162,13 @@ export const AuthContextProvider = ({ children }) => {
   // 1. Phone OTP Dispatch (Zero OTP exposure)
   const sendPhoneOTP = async (phone, purpose = "signup") => {
     try {
-      const res = await fetch("/api/auth/phone/send-otp", {
+      const { res, data } = await safeFetch("/api/auth/phone/send-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, purpose })
       });
-      const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to send SMS verification code");
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Failed to send SMS verification code");
       }
 
       if (data.isSandbox) {
@@ -194,15 +192,13 @@ export const AuthContextProvider = ({ children }) => {
   // 2. Phone OTP Verification
   const verifyPhoneOTP = async (phone, otp, purpose = "signup") => {
     try {
-      const res = await fetch("/api/auth/phone/verify-otp", {
+      const { res, data } = await safeFetch("/api/auth/phone/verify-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, otp, purpose })
       });
-      const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Phone verification failed");
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Phone verification failed");
       }
 
       toast.success(data.message || "Phone number verified successfully! ✅");
@@ -216,15 +212,13 @@ export const AuthContextProvider = ({ children }) => {
   // 3. Email OTP Dispatch (Zero OTP exposure)
   const sendEmailOTP = async (email, purpose = "signup") => {
     try {
-      const res = await fetch("/api/auth/email/send-otp", {
+      const { res, data } = await safeFetch("/api/auth/email/send-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, purpose })
       });
-      const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to send email verification code");
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Failed to send email verification code");
       }
 
       toast.success(data.message || `Verification code sent to ${email} ✉️`, {
@@ -241,15 +235,13 @@ export const AuthContextProvider = ({ children }) => {
   // 4. Email OTP Verification
   const verifyEmailOTP = async (email, otp, purpose = "signup") => {
     try {
-      const res = await fetch("/api/auth/email/verify-otp", {
+      const { res, data } = await safeFetch("/api/auth/email/verify-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp, purpose })
       });
-      const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Email verification failed");
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Email verification failed");
       }
 
       toast.success(data.message || "Email address verified successfully! ✅");
@@ -263,15 +255,13 @@ export const AuthContextProvider = ({ children }) => {
   // 5. Final Account Registration (Validates Phone + Email verification tokens)
   const registerAccount = async (payload) => {
     try {
-      const res = await fetch("/api/auth/register", {
+      const { res, data } = await safeFetch("/api/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Account creation failed");
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Account creation failed");
       }
 
       const userData = { ...data.user, token: data.token };
@@ -288,18 +278,16 @@ export const AuthContextProvider = ({ children }) => {
   // 6. Login OTP Dispatch (Phone or Email)
   const sendLoginOTP = async (identifier) => {
     try {
-      const res = await fetch("/api/auth/login/send-otp", {
+      const { res, data } = await safeFetch("/api/auth/login/send-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier })
       });
-      const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        if (data.isNewUser) {
+      if (!res.ok || !data?.success) {
+        if (data?.isNewUser) {
           return { success: false, isNewUser: true, message: data.message };
         }
-        throw new Error(data.message || "Failed to send verification code");
+        throw new Error(data?.message || "Failed to send verification code");
       }
 
       if (data.isSandbox) {
@@ -323,18 +311,16 @@ export const AuthContextProvider = ({ children }) => {
   // 7. Login OTP Verification
   const verifyLoginOTP = async (identifier, otp) => {
     try {
-      const res = await fetch("/api/auth/login/verify-otp", {
+      const { res, data } = await safeFetch("/api/auth/login/verify-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, otp })
       });
-      const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        if (data.isNewUser) {
+      if (!res.ok || !data?.success) {
+        if (data?.isNewUser) {
           return { success: false, isNewUser: true, message: data.message };
         }
-        throw new Error(data.message || "Login verification failed");
+        throw new Error(data?.message || "Login verification failed");
       }
 
       const userData = { ...data.user, token: data.token, currentSessionId: data.sessionId };
@@ -353,7 +339,7 @@ export const AuthContextProvider = ({ children }) => {
     try {
       const stored = localStorage.getItem("chat-user");
       const token = stored ? JSON.parse(stored)?.token : null;
-      await fetch("/api/auth/logout", {
+      await safeFetch("/api/auth/logout", {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });

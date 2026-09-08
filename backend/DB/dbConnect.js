@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 
 const dbConnect = async () => {
+    // Reuse cached connection across serverless / lambda invocations
+    if (mongoose.connection.readyState >= 1) {
+        return mongoose.connection;
+    }
+
     const primaryUri = process.env.MONGODB_CONNECT;
     const localUri = "mongodb://127.0.0.1:27017/chat_app";
 
@@ -10,10 +15,10 @@ const dbConnect = async () => {
     if (shouldTryPrimary) {
         try {
             await mongoose.connect(primaryUri, {
-                serverSelectionTimeoutMS: 5000
+                serverSelectionTimeoutMS: 8000
             });
             console.log("Connected to MongoDB Atlas successfully 🍃");
-            return;
+            return mongoose.connection;
         } catch (error) {
             console.warn(`Could not connect to MongoDB Atlas (${error.message}). Falling back to local MongoDB...`);
         }

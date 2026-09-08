@@ -62,8 +62,9 @@ export const sendEmailOTP = async (recipientEmail, otp) => {
         // =====================================================================
         // 1. RESEND API DISPATCH
         // =====================================================================
-        if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim() !== "") {
-            const resend = new Resend(process.env.RESEND_API_KEY.trim());
+        const resendApiKey = process.env.RESEND_API_KEY?.trim();
+        if (resendApiKey) {
+            const resend = new Resend(resendApiKey);
             const fromEmail = process.env.EMAIL_FROM || "Aryavarta <onboarding@resend.dev>";
 
             console.log(`[Email Gateway] Dispatching Resend email to ${maskedEmail} from ${fromEmail}...`);
