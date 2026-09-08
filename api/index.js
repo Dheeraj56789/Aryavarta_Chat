@@ -67,4 +67,13 @@ app.get(["/api/health", "/health"], (req, res) => {
     });
 });
 
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error("[API Unhandled Error]:", err);
+    res.status(500).json({
+        success: false,
+        message: err.message || "An internal server error occurred"
+    });
+});
+
 export default app;
