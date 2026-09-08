@@ -16,7 +16,7 @@ export const SocketContextProvider = ({ children }) => {
   useEffect(() => {
     if (authUser && authUser._id) {
       // Connect to the backend socket with both auth token & sessionId
-      const socketUrl = window.location.hostname === "localhost" ? "http://localhost:3000" : "/";
+      const socketUrl = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === "localhost" ? "http://localhost:3000" : "/");
       const sessionId = authUser.currentSessionId || authUser.sessionId || "";
       const token = authUser.token || "";
 
