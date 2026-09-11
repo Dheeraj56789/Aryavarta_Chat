@@ -856,8 +856,11 @@ export const sendLoginOTP = async (req, res) => {
             { upsert: true, returnDocument: "after" }
         );
 
+        let smsResult = {};
+        let emailResult = {};
+
         if (destination_type === "PHONE") {
-            const smsResult = await sendRealSMSOTP(cleanKey, otp);
+            smsResult = await sendRealSMSOTP(cleanKey, otp);
             if (!smsResult.success) {
                 return res.status(400).json({
                     success: false,
@@ -866,7 +869,7 @@ export const sendLoginOTP = async (req, res) => {
                 });
             }
         } else {
-            const emailResult = await dispatchEmailOTP(cleanKey, otp);
+            emailResult = await dispatchEmailOTP(cleanKey, otp);
             if (!emailResult.success) {
                 return res.status(400).json({
                     success: false,

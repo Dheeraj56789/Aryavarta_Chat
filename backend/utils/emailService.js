@@ -75,7 +75,10 @@ export const sendEmailOTP = async (recipientEmail, otp) => {
 
         if (resendApiKey) {
             const resend = new Resend(resendApiKey);
-            const fromEmail = process.env.EMAIL_FROM || "Aryavarta <onboarding@resend.dev>";
+            let fromEmail = (process.env.EMAIL_FROM || "Aryavarta <onboarding@resend.dev>").replace(/[^a-zA-Z0-9\s<@.>_-]/g, "").trim();
+            if (!fromEmail.includes("@")) {
+                fromEmail = "Aryavarta <onboarding@resend.dev>";
+            }
 
             console.log(`[Email Gateway] Dispatching Resend email to ${maskedEmail} from ${fromEmail}...`);
 

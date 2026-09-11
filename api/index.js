@@ -3,6 +3,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import path from "path";
+import mongoose from "mongoose";
 import dbConnect from "../backend/DB/dbConnect.js";
 import authRouter from "../backend/rout/authUser.js";
 import messageRouter from "../backend/rout/messageRout.js";
@@ -27,14 +28,28 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// Serverless DB Connection check
+// Health check endpoint (placed before DB check so runtime status can be verified independently)
+app.get(["/api/health", "/health"], (req, res) => {
+    res.status(200).json({
+        status: "online",
+        runtime: "vercel-serverless",
+        dbState: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Serverless DB Connection check for API routes
 app.use(async (req, res, next) => {
     try {
         await dbConnect();
         next();
     } catch (err) {
         console.error("[Vercel API DB Connection Error]:", err.message);
-        return res.status(500).json({ success: false, message: "Database connection failed. Please check MongoDB Atlas access." });
+        return res.status(500).json({ 
+            success: false, 
+            message: "Database connection failed. Please verify your MongoDB Atlas connection string and ensure Network Access (0.0.0.0/0) is enabled.",
+            error: err.message
+        });
     }
 });
 
@@ -57,15 +72,6 @@ app.use("/meeting", meetingRouter);
 
 app.use("/api/calls", callRouter);
 app.use("/calls", callRouter);
-
-// Health check endpoint
-app.get(["/api/health", "/health"], (req, res) => {
-    res.status(200).json({
-        status: "online",
-        runtime: "vercel-serverless",
-        timestamp: new Date().toISOString()
-    });
-});
 
 // Global error handler
 app.use((err, req, res, next) => {
