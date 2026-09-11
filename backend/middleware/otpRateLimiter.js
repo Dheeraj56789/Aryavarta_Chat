@@ -8,7 +8,7 @@ const WINDOW_MS = 15 * 60 * 1000; // 15-minute sliding window
 const MAX_REQUESTS_PER_IP = 5;      // Max 5 OTP requests per IP in 15 minutes
 
 // Periodic garbage collection to keep memory lean
-setInterval(() => {
+const gcTimer = setInterval(() => {
     const now = Date.now();
     for (const [ip, record] of ipRequests.entries()) {
         if (now - record.startTime > WINDOW_MS) {
@@ -16,6 +16,9 @@ setInterval(() => {
         }
     }
 }, 5 * 60 * 1000);
+if (gcTimer && gcTimer.unref) {
+    gcTimer.unref();
+}
 
 export const otpIpRateLimiter = (req, res, next) => {
     // Determine client IP
